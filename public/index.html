@@ -138,11 +138,29 @@
     </div>
   </div>
 
+<script src="config.js"></script>
 <script>
 (async () => {
-  // ───────── Config   (rellena tras tu deploy) ──────────
-  const CHAIN_L1 = "0x7a69";   // 31337
-  const SENDER_L1 = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
+  // ───────── Config (desde public/config.js, generado por el deploy) ─────────
+  const CFG = window.CONTRACT_CONFIG || {};
+  const CHAIN_L1    = CFG.CHAIN_N1  || "0x7a69";   // 31337
+  const SENDER_L1   = CFG.SENDER_N1 || "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
+  const N2_EVENT    = CFG.N2_EVENT  || "Minted";   // 'Released' en ZK
+  const BRIDGE_MODE = CFG.MODE      || "classic";
+  // Reflejar direcciones y modo en la UI
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el && v) el.textContent = v; };
+  setTxt("l1-token-addr", CFG.TOKEN_N1);
+  setTxt("l1-sender-addr", CFG.SENDER_N1);
+  setTxt("l2-token-addr", CFG.TOKEN_N2);
+  setTxt("l2-receiver-addr", CFG.RECEIVER_N2);
+  try {
+    const h1 = document.querySelector("h1") || document.body;
+    const badge = document.createElement("span");
+    badge.textContent = BRIDGE_MODE === "zk" ? "🔒 Modo ZK" : "🤝 Modo clásico";
+    badge.style.cssText = "font-size:.8rem;padding:2px 8px;border-radius:8px;margin-left:8px;" +
+      (BRIDGE_MODE === "zk" ? "background:#0a7;color:#fff" : "background:#888;color:#fff");
+    h1.appendChild(badge);
+  } catch (_) {}
   // ──────────────────────────────────────────────────────
 
   if (!window.ethereum) return alert("Instala MetaMask");
@@ -150,6 +168,24 @@
   const log = (m) => {
     const el = document.getElementById("log");
     el.textContent += m + "\n"; el.scrollTop = el.scrollHeight;
+  };
+
+  // En modo ZK, release() tarda (el relayer corre bb.js: 1-2 min la primera vez
+  // que baja el SRS). Sin esto el log queda mudo y parece colgado.
+  let zkWaitTimer = null;
+  const stopZkWaitTicker = () => { if (zkWaitTimer) { clearInterval(zkWaitTimer); zkWaitTimer = null; } };
+  const startZkWaitTicker = () => {
+    stopZkWaitTicker();
+    const start = Date.now();
+    log("⏳ Modo ZK: el relayer está generando la prueba (bb.js). La primera vez baja el SRS (~1-2 min); después es más rápido.");
+    zkWaitTimer = setInterval(() => {
+      const secs = Math.round((Date.now() - start) / 1000);
+      if (secs > 300) {
+        log("⚠️ Más de 5 min esperando — revisá `docker compose logs -f relayer` (puede haber revertido).");
+        return stopZkWaitTicker();
+      }
+      log(`   … generando prueba (${secs}s)`);
+    }, 15000);
   };
 
   /* auto-connect with error handling */
@@ -876,11 +912,10 @@
     }
   ];
 
-  const token  = new ethers.Contract("0x5FbDB2315678afecb367f032d93F642f64180aa3" , abiToken , signer);
+  const token  = new ethers.Contract(CFG.TOKEN_N1 || "0x5FbDB2315678afecb367f032d93F642f64180aa3", abiToken , signer);
   const sender = new ethers.Contract(SENDER_L1, abiSender, signer);
 
   document.getElementById("btn-bridge").onclick = async () => {
-    debugger;
     try {
       console.log('escuchando');
       await switchTo(CHAIN_L1);
@@ -905,6 +940,7 @@
       const lockId = idBN - 1n; // BigInt math OK
       log(`✅ Locked id ${lockId.toString()}, amount ${ethers.formatUnits(amount,18)} GUA`);
       log("🔄 Espera que el relayer acuñe en L2…");
+      if (BRIDGE_MODE === "zk") startZkWaitTicker();
 
     } catch (e) {
       console.error("Bridge error:", e);
@@ -1042,10 +1078,10 @@
     }
   ];
   // Contract addresses and providers setup
-  const TOKEN_L1 = "0x5FbDB2315678afecb367f032d93F642f64180aa3"; // Token contract L1
-  const CONTRACT_L1 = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"; // Sender contract address
-  const TOKEN_L2 = "0x8464135c8F25Da09e49BC8782676a84730C318bC"; // Token contract L2  
-  const CONTRACT_L2 = "0x71C95911E9a5D330f4D621842EC243EE1343292e"; // Receiver contract address
+  const TOKEN_L1 = CFG.TOKEN_N1 || "0x5FbDB2315678afecb367f032d93F642f64180aa3"; // Token L1
+  const CONTRACT_L1 = CFG.SENDER_N1 || "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"; // Sender L1
+  const TOKEN_L2 = CFG.TOKEN_N2 || "0x8464135c8F25Da09e49BC8782676a84730C318bC"; // Token L2
+  const CONTRACT_L2 = CFG.RECEIVER_N2 || "0x71C95911E9a5D330f4D621842EC243EE1343292e"; // Receiver L2
 
   // Note: Browser always connects to localhost (mapped ports from docker-compose)
   // Docker containers expose ports: hardhat-n1:8545->8545, anvil-n2:9545->9545
@@ -1058,10 +1094,17 @@
   
   // Create bridge contracts for events  
   const contractL1 = new ethers.Contract(CONTRACT_L1, abiSender, providerL1);
-  const contractL2 = new ethers.Contract(CONTRACT_L2, abiMinted, providerL2);
+  // ABI con ambos eventos (Minted clásico / Released ZK) → escuchamos el del modo activo.
+  const eventsAbiL2 = [
+    "event Minted(uint256 indexed id, address indexed to, uint256 amount)",
+    "event Released(uint256 indexed id, address indexed to, uint256 amount)"
+  ];
+  const contractL2 = new ethers.Contract(CONTRACT_L2, eventsAbiL2, providerL2);
 
-  contractL2.on("Minted", (to, amount, lockId, event) => {
-    log(`🎉 Minted: to=${to}, amount=${ethers.formatUnits(amount,18)} GUA, lockId=${lockId}`);
+  contractL2.on(N2_EVENT, (id, to, amount, event) => {
+    stopZkWaitTicker();
+    const icon = N2_EVENT === "Released" ? "🔓" : "🎉";
+    log(`${icon} ${N2_EVENT}: id=${id}, to=${to}, amount=${ethers.formatUnits(amount,18)} GUA`);
   });
 
   // Balance Monitoring System

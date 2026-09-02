@@ -11,6 +11,15 @@
     "deploy:n2": "hardhat run scripts/deployN2.js --network localN2",
     "config": "node scripts/generate-config.js",
     "relayer": "node relayer/relayer.js",
+    "relayer:zk": "node relayer/relayer-zk.js",
+    "deploy:n2:zk": "hardhat run scripts/deployN2-zk.js --network localN2",
+    "deploy:n1:docker": "hardhat run scripts/deployN1.js --network dockerN1",
+    "deploy:n2:docker": "hardhat run scripts/deployN2.js --network dockerN2",
+    "deploy:n2:zk:docker": "hardhat run scripts/deployN2-zk.js --network dockerN2",
+    "circuits:mpt": "bash scripts/generate-verifiers.sh mpt",
+    "circuits:bls": "bash scripts/generate-verifiers.sh bls",
+    "test:release": "hardhat test test/ReleaseZK.test.js",
+    "demo:zk": "node scripts/testReleaseZK.js",
     "frontend": "npx serve public",
     "test": "hardhat test --network localL1",
     "test:bridge": "hardhat test test/Bridge.test.js --network localL1",
@@ -25,6 +34,8 @@
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.2",
     "ethers": "^6.15.0",
-    "dotenv": "^16.4.1"
+    "dotenv": "^16.4.1",
+    "@noir-lang/noir_js": "1.0.0-beta.22",
+    "@aztec/bb.js": "5.0.0-nightly.20260522"
   }
 }

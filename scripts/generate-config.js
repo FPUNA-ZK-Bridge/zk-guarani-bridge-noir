@@ -1,46 +1,48 @@
+// scripts/generate-config.js
+// Genera public/config.js para el frontend, según ENABLE_ZK_PROOF_WAY.
+// Incluye el modo, las direcciones L1/L2 y el evento N2 a escuchar
+// (Released en ZK, Minted en clásico).
 import { readFileSync, writeFileSync, existsSync } from "fs";
 
-function generateFrontendConfig() {
-  try {
-    // Verificar que el archivo de deploy existe
-    if (!existsSync("deploy-N1.json")) {
-      console.error(
-        "❌ deploy-N1.json no encontrado. Ejecuta: npm run deploy:N1"
-      );
-      process.exit(1);
-    }
+const ZK = String(process.env.ENABLE_ZK_PROOF_WAY || "false") === "true";
 
-    // Leer configuración de deploy
-    const deployData = JSON.parse(readFileSync("deploy-N1.json", "utf8"));
-
-    if (!deployData.token || !deployData.sender) {
-      console.error(
-        "❌ deploy-N1.json inválido. Debe contener 'token' y 'sender'"
-      );
-      process.exit(1);
-    }
-
-    // Generar config para el frontend
-    const frontendConfig = `// Auto-generado desde deploy-N1.json - NO EDITAR MANUALMENTE
-window.CONTRACT_CONFIG = {
-  CHAIN_N1: "0x7a69",   // 31337 (Hardhat local)
-  TOKEN_N1: "${deployData.token}",
-  SENDER_N1: "${deployData.sender}",
-  NETWORK_NAME: "Local Hardhat N1",
-  GENERATED_AT: "${new Date().toISOString()}"
-};
-
-console.log("📄 Config cargada:", window.CONTRACT_CONFIG);
-`;
-
-    writeFileSync("public/config.js", frontendConfig);
-    console.log("✅ Configuración generada en public/config.js");
-    console.log(`   TOKEN_L1: ${deployData.token}`);
-    console.log(`   SENDER_L1: ${deployData.sender}`);
-  } catch (error) {
-    console.error("❌ Error generando configuración:", error.message);
-    process.exit(1);
-  }
+function readJson(p) {
+  return existsSync(p) ? JSON.parse(readFileSync(p, "utf8")) : null;
 }
 
-generateFrontendConfig();
+function main() {
+  const n1 = readJson("deploy-N1.json");
+  if (!n1?.token || !n1?.sender) {
+    console.error("❌ deploy-N1.json no encontrado o inválido. Ejecutá el deploy de N1 primero.");
+    process.exit(1);
+  }
+
+  const n2File = ZK ? "deploy-N2-zk.json" : "deploy-N2.json";
+  const n2 = readJson(n2File);
+  if (!n2?.token || !n2?.receiver) {
+    console.warn(`⚠  ${n2File} no encontrado — el frontend quedará con direcciones N2 vacías.`);
+  }
+
+  const config = {
+    MODE: ZK ? "zk" : "classic",
+    N2_EVENT: ZK ? "Released" : "Minted",
+    CHAIN_N1: "0x7a69", // 31337
+    TOKEN_N1: n1.token,
+    SENDER_N1: n1.sender,
+    TOKEN_N2: n2?.token || "",
+    RECEIVER_N2: n2?.receiver || "",
+    GENERATED_AT: new Date().toISOString(),
+  };
+
+  const js =
+    `// Auto-generado por scripts/generate-config.js — NO EDITAR A MANO\n` +
+    `window.CONTRACT_CONFIG = ${JSON.stringify(config, null, 2)};\n` +
+    `console.log("📄 Config (${config.MODE}):", window.CONTRACT_CONFIG);\n`;
+
+  writeFileSync("public/config.js", js);
+  console.log(`✅ public/config.js generado — modo ${config.MODE}`);
+  console.log(`   N1  token ${config.TOKEN_N1}  ·  sender ${config.SENDER_N1}`);
+  console.log(`   N2  token ${config.TOKEN_N2}  ·  receiver ${config.RECEIVER_N2}  ·  evento ${config.N2_EVENT}`);
+}
+
+main();

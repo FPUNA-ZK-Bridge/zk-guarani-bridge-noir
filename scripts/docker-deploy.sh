@@ -1,35 +1,36 @@
 #!/bin/bash
-
-# Script to deploy contracts after Docker services are up
+# Deploy de contratos tras levantar los servicios Docker.
+# Elige el flujo según ENABLE_ZK_PROOF_WAY (true = ZK, false = clásico).
 set -e
 
-echo "🚀 Starting Guarani Bridge deployment..."
+ZK="${ENABLE_ZK_PROOF_WAY:-false}"
+echo "🚀 Guarani Bridge deployment (ENABLE_ZK_PROOF_WAY=$ZK)"
 
-# Wait for services to be ready
+# Esperar a que las cadenas estén listas
 echo "⏳ Waiting for Hardhat (L1)..."
 timeout 60 bash -c 'until curl -s http://hardhat-n1:8545 > /dev/null; do sleep 2; done' || exit 1
-
 echo "⏳ Waiting for Anvil (L2)..."
 timeout 60 bash -c 'until curl -s http://anvil-n2:9545 > /dev/null; do sleep 2; done' || exit 1
-
 echo "✅ Services are ready!"
 
-# Deploy to L1
-echo "📦 Deploying GuaraniToken and Sender to L1..."
-npm run deploy:n1
+# L1: siempre igual (GuaraniToken + Sender)
+echo "📦 Deploying GuaraniToken + Sender to L1..."
+npm run deploy:n1:docker
 
-# Deploy to L2
-echo "📦 Deploying Receiver to L2..."
-npm run deploy:n2
+# L2: según el modo
+if [ "$ZK" = "true" ]; then
+  echo "🔒 Deploying ZK contracts to L2 (Verifier + RootRegistry + ReceiverZK)..."
+  npm run deploy:n2:zk:docker
+else
+  echo "📦 Deploying classic Receiver to L2..."
+  npm run deploy:n2:docker
+fi
 
-# Generate config if needed
-echo "⚙️ Generating configuration..."
+# Config del frontend (lee ENABLE_ZK_PROOF_WAY y el deploy correspondiente)
+echo "⚙️  Generating frontend config (public/config.js)..."
 npm run config
 
-echo "✅ Deployment complete!"
 echo ""
-echo "📄 Deployment files:"
-echo "  - deploy-N1.json (L1 contracts)"
-echo "  - deploy-N2.json (L2 contracts)"
-echo ""
-echo "🌉 Bridge is ready to use!"
+echo "✅ Deployment complete!  (modo ZK=$ZK)"
+echo "📄 Files: deploy-N1.json + $([ "$ZK" = "true" ] && echo deploy-N2-zk.json || echo deploy-N2.json)  ·  public/config.js"
+echo "🌉 Bridge listo."

@@ -1,0 +1,8 @@
+# Artefactos generados (grandes, reproducibles)
+*.json
+*.gz
+vk
+vk_hash
+proof
+public_inputs
+!README.md

@@ -43,26 +43,30 @@ services:
       hardhat-n1:
         condition: service_healthy
 
-  # Relayer Service
+  # Relayer Service (elige ZK o clásico según ENABLE_ZK_PROOF_WAY)
   relayer:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: guarani-relayer
-    command: npm run relayer
+    # El entrypoint decide relayer-zk.js vs relayer.js según el flag.
+    command: ["bash", "relayer/docker-entrypoint.sh"]
+    # En modo ZK, bb.js genera la prueba en el contenedor (SRS + RAM). Dale memoria.
+    mem_limit: 6g
     networks:
       - guarani-network
     environment:
       - NODE_ENV=production
       - RPC_URL_N1=http://hardhat-n1:8545
       - RPC_URL_N2=http://anvil-n2:9545
-      - NODE_OPTIONS=--max-old-space-size=2048
+      - NODE_OPTIONS=--max-old-space-size=4096
+      - ENABLE_ZK_PROOF_WAY=${ENABLE_ZK_PROOF_WAY:-false}
+      - PRIVATE_KEY_RELAYER=${PRIVATE_KEY_RELAYER}
+    # Monta el proyecto para ver deploy-*.json, circuits/ (ACIR) y el fixture.
+    # node_modules queda el de la imagen (incluye bb.js / noir_js).
     volumes:
-      - ./relayer:/app/relayer
-      - ./scripts:/app/scripts
-      - ./utils:/app/utils
-      - ./deploy-N1.json:/app/deploy-N1.json:ro
-      - ./deploy-N2.json:/app/deploy-N2.json:ro
+      - .:/app
+      - /app/node_modules
     depends_on:
       - hardhat-n1
       - anvil-n2
@@ -95,6 +99,8 @@ services:
       - guarani-network
     environment:
       - NODE_ENV=production
+      - ENABLE_ZK_PROOF_WAY=${ENABLE_ZK_PROOF_WAY:-false}
+      - PRIVATE_KEY_RELAYER=${PRIVATE_KEY_RELAYER}
     volumes:
       - .:/app
       - /app/node_modules

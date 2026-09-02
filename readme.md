@@ -52,6 +52,74 @@ Flujo Detallado:
 6️⃣ **Confirmación**: Se acuñan tokens equivalentes para el destinatario
 ```
 
+## 🔐 Modo ZK (puente trustless)
+
+El puente tiene **dos modos**, elegidos con `ENABLE_ZK_PROOF_WAY` en `.env`:
+
+- **Clásico** (`false`): el relayer llama a `mintRemote()` y se **confía** en él para acuñar.
+- **ZK** (`true`): el relayer adjunta una **prueba de conocimiento cero** y el contrato
+  `ReceiverZK.release()` la **verifica on-chain** antes de acuñar. El relayer deja de ser un
+  acuñador de confianza y pasa a ser un *probador*: cualquiera con una prueba válida puede
+  liberar, pero **nadie puede acuñar sin ella**. Es el núcleo de la tesis: reemplazar
+  confianza por verificación criptográfica.
+
+### Flujo ZK
+
+```
+[Usuario] ─lock()→ [Sender (N1)] ─emit Locked→ [Relayer]
+                                                   │  (arma inputs, corre el circuito)
+                                                   ▼
+                                          [Noir Engine (off-chain)] → ZK-proof
+                                                   │  (proof + inputs públicos)
+                                                   ▼
+                            [ReceiverZK.release() (N2)] → [TxInclusionVerifier.sol] ✓
+                                                   │
+                                                   ▼  si la prueba es válida: mint → fondos liberados
+```
+
+### ¿Dónde se usa la ZK?
+
+- **Generación — off-chain (relayer):** el circuito Noir compilado + `bb.js` arman la prueba
+  (`relayer/prover.js`). Es la parte pesada del ZK.
+- **Verificación — on-chain (N2):** `TxInclusionVerifier.sol` (verificador UltraHonk que genera
+  `bb`, ~17 KB) valida la prueba dentro de `release()`, que **revierte si no es válida**.
+
+### Qué prueba el circuito
+
+- **Circuito MPT** (`noir-merkle`) — *verificación de transacciones*: demuestra que la tx `lock`
+  está **incluida** en un bloque (bajo el `transactionsRoot`). **Es el que corre hoy.**
+- **Circuito BLS** (`zk-bridge-zero`) — *verificación de firmas*: demuestra que el sync committee
+  de Ethereum **firmó** ese bloque (finalidad). **Fase 4, aún no conectado.**
+
+### Componentes ZK
+
+| Componente | Rol |
+|---|---|
+| `noir-merkle` (circuito MPT) | Genera el ACIR; prueba inclusión de la tx |
+| `relayer/prover.js` | Corre el circuito (NoirJS + bb.js) → `{proof, publicInputs}` |
+| `contracts/verifiers/TxInclusionVerifier.sol` | Verificador UltraHonk on-chain (lo genera `bb`) |
+| `contracts/RootRegistry.sol` | Registro (temporal) de `transactionsRoot` confiables |
+| `contracts/ReceiverZK.sol` | `release()`: verifica la prueba + anti-replay → acuña |
+| `relayer/relayer-zk.js` | Escucha `Locked`, obtiene la prueba y llama a `release()` |
+| `scripts/generate-verifiers.sh` (`npm run circuits:mpt`) | Genera el verificador + copia el ACIR |
+
+### Estado actual (honesto)
+
+- ✅ **Fases 1–2 — funciona end-to-end, con prueba real de cada lock:** lock en N1 →
+  `relayer/buildRawCase.js` arma la MPT proof del bloque real (ya no un fixture) →
+  `relayer/prover.js` genera la prueba ZK → **verificación on-chain** → mint en N2. El
+  verificador es real (rechaza pruebas adulteradas), con anti-replay.
+- ✅ **Fase 3 — binding de `(recipient, amount)` implementado, desplegado y probado en vivo:**
+  el circuito (`circuits/fase3/`) ata `(to, amount)` al calldata del `lock()` incluido en el
+  bloque; `ReceiverZKBoundBLS` (deploy con `USE_BLS=1`) exige que coincidan con la prueba →
+  **no se puede adulterar la transferencia**. Test: `test/ReleaseZKBound.test.js`; demo de
+  ataque: `scripts/attackDemo.js`.
+- ⏳ **Fase 4 — trustless completo (pendiente):** (1) binding de `to == Sender` (falta parsear
+  el `to` de la tx desde el RLP para atarlo también); (2) firma **BLS real** (hoy `sigVerifier`
+  es un stub que devuelve `true`) para reemplazar el `RootRegistry` confiable.
+
+> Diseño completo y fases en **`docs/INTEGRACION_ZK.md`**. Arranque y pruebas en **`docs/RUN.md`**.
+
 ## 🔧 Componentes Técnicos
 
 ### Contratos Inteligentes
@@ -94,6 +162,20 @@ Para evitar errores comunes como "Contract not found", sigue **exactamente** est
 ```bash
 git clone <repository-url>
 cd guarani-bridge
+
+# Configuración: el .env controla el modo del puente
+cp .env.example .env
+```
+
+En `.env`, el switch **`ENABLE_ZK_PROOF_WAY`** elige el modo:
+- `true`  → flujo **ZK** (`ReceiverZK.release()` verifica una prueba on-chain)
+- `false` → flujo **clásico** (`Receiver.mintRemote()`, relayer de confianza)
+
+Solo para el modo **ZK** (una vez, requiere `nargo` + `bb` instalados): generar el
+verificador Solidity y el ACIR del circuito. En modo clásico, salteá esto.
+
+```bash
+npm run circuits:mpt
 ```
 
 #### 2️⃣ Levantar servicios base
@@ -110,27 +192,29 @@ docker compose ps
 # Debe mostrar hardhat-n1 como "healthy"
 ```
 
-#### 3️⃣ Desplegar contratos (CRÍTICO)
+#### 3️⃣ Desplegar + generar config (CRÍTICO — un solo comando)
 
 ```bash
-# Desplegar en L1 (Hardhat)
-docker compose run --rm deployer npx hardhat run scripts/deployN1.js --network dockerN1
-
-# Desplegar en L2 (Anvil)
-docker compose run --rm deployer npx hardhat run scripts/deployN2.js --network dockerN2
-
-# Verificar que deploy-N1.json y deploy-N2.json se generaron
-ls -la deploy-*.json
+docker compose run --rm deployer bash scripts/docker-deploy.sh
 ```
 
-#### 4️⃣ Mintear tokens iniciales (para testing)
+Según `ENABLE_ZK_PROOF_WAY`, este script:
+- despliega N1 (GuaraniToken + Sender) y N2 (contratos ZK o Receiver clásico),
+- escribe `deploy-N1.json` y `deploy-N2*.json`,
+- **regenera `public/config.js`** con las direcciones y el modo (lo que consume el frontend).
+
+> ⚠️ **Cada vez que reinicies las cadenas** (`down`/`up` o `restart` de los nodos) quedan
+> vacías: **volvé a correr este comando**. Redepliega y reescribe el config; si no, el
+> frontend queda apuntando a contratos inexistentes ("Contract not found").
+
+#### 4️⃣ (Opcional) mintear a otra cuenta
+
+La cuenta #0 (`0xf39F…92266`) ya tiene 1.000.000 GUA en N1 tras el deploy. Si querés usar
+otra cuenta en MetaMask, minteale:
 
 ```bash
-# Mintear tokens al deployer
-docker compose run --rm deployer npx hardhat run scripts/mintTokens.js --network dockerN1
-
-# Mintear tokens a cuenta específica (opcional)
-docker compose run --rm deployer node scripts/mintToFrontendAccount.js
+docker compose run --rm -e MINT_TO=0xTU_CUENTA deployer \
+  npx hardhat run scripts/mintTo.js --network dockerN1
 ```
 
 #### 5️⃣ Iniciar servicios adicionales
@@ -166,9 +250,22 @@ docker compose ps
    - **Chain ID**: 1338
    - **Currency Symbol**: ETH
 
-3. Importar cuenta de prueba:
-   - **Private Key**: `0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d`
-   - Esta cuenta tiene tokens GUA pre-minteados
+3. Importar la cuenta #0 (tiene 1.000.000 GUA en N1 tras el deploy):
+   - **Private Key**: `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
+   - **Dirección**: `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`
+
+4. **Tras cada reinicio de cadena**, reseteá el nonce que MetaMask cachea:
+   Configuración → Avanzado → **Borrar datos de la pestaña de actividad**. Si no, las
+   transacciones fallan con "transacción fallida" aunque tengas saldo. Refrescá la página
+   con `Cmd+Shift+R` para tomar el `config.js` nuevo.
+
+### 🎯 Usar el puente (frontend)
+
+En **http://localhost:3000**: conectá MetaMask (cuenta #0, red 31337), poné la **dirección
+destino** y el **monto**, y tocá **Bridge**. El `lock` ocurre en N1; el relayer detecta el
+evento, y en **modo ZK** genera la prueba y llama a `release()` (el verificador la valida
+on-chain) mientras en **modo clásico** acuña con `mintRemote()`. El badge arriba (🔒 ZK /
+🤝 clásico) indica el modo activo, y vas a ver el evento de N2 (`Released`/`Minted`) en el log.
 
 ### 🚨 Troubleshooting Común
 
