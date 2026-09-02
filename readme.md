@@ -195,8 +195,12 @@ docker compose ps
 #### 3️⃣ Desplegar + generar config (CRÍTICO — un solo comando)
 
 ```bash
-docker compose run --rm deployer bash scripts/docker-deploy.sh
+docker compose run --rm -e USE_BLS=1 deployer bash scripts/docker-deploy.sh
 ```
+
+`USE_BLS=1` es solo para modo ZK — despliega `ReceiverZKBoundBLS` (Fase 3+4, ata
+`(recipient, amount)` a la prueba). Sin esa variable cae a `ReceiverZK` (Fase 1, sin ese
+binding). En modo clásico no aplica.
 
 Según `ENABLE_ZK_PROOF_WAY`, este script:
 - despliega N1 (GuaraniToken + Sender) y N2 (contratos ZK o Receiver clásico),
@@ -278,9 +282,10 @@ on-chain) mientras en **modo clásico** acuña con `mintRemote()`. El badge arri
 # 1. Verificar que los servicios estén corriendo
 docker compose ps
 
-# 2. Redesplegar contratos
-docker compose run --rm deployer npx hardhat run scripts/deployN1.js --network dockerN1
-docker compose run --rm deployer npx hardhat run scripts/deployN2.js --network dockerN2
+# 2. Redesplegar (usa el script que respeta ENABLE_ZK_PROOF_WAY, no los deploy
+#    scripts sueltos — esos ignoran el modo y pueden desplegar el receiver
+#    equivocado)
+docker compose run --rm -e USE_BLS=1 deployer bash scripts/docker-deploy.sh
 
 # 3. Reiniciar relayer y frontend
 docker compose restart relayer frontend
@@ -359,11 +364,12 @@ npm run deploy:n2    # Despliega en L2 (Anvil)
 
 Los archivos `deploy-N1.json` y `deploy-N2.json` contendrán las direcciones de los contratos desplegados.
 
-### 4️⃣ Configurar Frontend (Opcional)
+### 4️⃣ Configurar Frontend
 
-Edita las direcciones de los contratos en `public/index.html` y lanza el servidor:
+`public/config.js` (lo que lee el frontend) se **autogenera** — no se edita a mano:
 
 ```bash
+npm run config       # genera public/config.js desde deploy-N1.json/deploy-N2*.json
 npm run frontend     # Abre http://localhost:3000
 ```
 
@@ -491,30 +497,37 @@ curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","me
 
 ### Via Scripts
 
+No hay un alias `npm run script`; se corren con `hardhat run` directo, indicando la red
+(`localN1`/`localN2` en local, `dockerN1`/`dockerN2` dentro de Docker):
+
 ```bash
 # Mintear tokens iniciales
-npm run script scripts/mintTokens.js
+npx hardhat run scripts/mintTokens.js --network localN1
 
 # Aprobar tokens al contrato Sender
-npm run script scripts/approveTokens.js
+npx hardhat run scripts/approveTokens.js --network localN1
 
 # Bloquear tokens en L1
-npm run script scripts/lockTokens.js
+npx hardhat run scripts/lockTokens.js --network localN1
 
 # Verificar balances
-npm run script scripts/checkBalance.js
+npx hardhat run scripts/checkBalance.js --network localN1
 ```
 
 ## 🧪 Testing
 
+Necesitan N1 y N2 corriendo (Docker o `npm run node:n1`/`node:n2`) con los contratos ya
+desplegados — no son unitarios en un chain efímero, verifican el deploy real.
+
 ```bash
-# Ejecutar todos los tests
+# Ejecutar todos los tests (Bridge + Infrastructure + NetworkDiagnostic + ZK)
 npm test
 
 # Tests específicos
-npm run test:bridge           # Tests del puente
-npm run test:infrastructure   # Tests de infraestructura
-npm run test:diagnostics      # Diagnósticos de red
+npm run test:bridge        # Tests del puente (lock/mint/replay, self-contenido)
+npm run test:infra         # Tests de infraestructura (contra deploy-N1.json/deploy-N2*.json reales)
+npm run test:diagnostic    # Diagnósticos de red (conectividad N1/N2, .env)
+npm run test:release       # Tests ZK (ReceiverZK, no necesita N1/N2 corriendo)
 ```
 
 ## 📁 Estructura del Proyecto
