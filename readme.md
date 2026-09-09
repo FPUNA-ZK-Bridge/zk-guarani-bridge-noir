@@ -1,544 +1,307 @@
-# Guarani Bridge 🌉
+# Guarani Bridge
 
-Un puente de tokens descentralizado que permite transferir **GuaraniTokens** entre dos cadenas de bloques (L1 ↔ L2) de forma segura y eficiente. Implementa el patrón **lock-and-mint** con protección contra replay attacks y verificación criptográfica.
+Puente de tokens entre dos cadenas (L1 ↔ L2) que transfiere **GuaraniToken (GUA)** con el
+patrón **lock-and-mint**: el token se bloquea en la cadena de origen y se acuña un equivalente
+en la de destino. Tiene dos modos de liberar los fondos en destino, elegidos con
+`ENABLE_ZK_PROOF_WAY` en `.env`:
 
-## ✨ Características Principales
+- **Clásico** — un relayer de confianza acuña directamente.
+- **ZK** — el relayer adjunta una prueba de conocimiento cero (circuito Noir) y un verificador
+  on-chain la valida antes de acuñar. Es el eje de la tesis: reemplazar la confianza en el
+  relayer por verificación criptográfica.
 
-- 🔒 **Lock-and-Mint Pattern**: Los tokens se bloquean en L1 y se acuñan equivalentes en L2
-- 🛡️ **Replay Protection**: Previene el procesamiento duplicado de transacciones
-- 🤖 **Relayer Automatizado**: Escucha eventos y ejecuta transferencias automáticamente
-- 🔍 **Transparencia Total**: Todos los eventos son auditables en ambas cadenas
-- 🎯 **Gas Optimizado**: Contratos eficientes con mínimo consumo de gas
-- 🧪 **Entorno de Testing**: Configuración completa para desarrollo local
+Este documento asume el proyecto **dockerizado**, que es como corre hoy en día. Todo el stack
+(las dos cadenas, el relayer y el frontend) se orquesta con `docker-compose.yml`.
 
-## 🌉 Cómo Funciona
+## Glosario rápido
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           GUARANI BRIDGE FLOW                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-    L1 (Hardhat - Puerto 31337)              L2 (Anvil - Puerto 1338)
-    ┌─────────────────────────┐              ┌─────────────────────────┐
-    │                         │              │                         │
-    │  👤 Usuario             │              │  👤 Usuario (mismo)     │
-    │  📦 GuaraniToken        │              │  📦 GuaraniToken        │
-    │  🔒 Sender Contract     │              │  🏭 Receiver Contract   │
-    │                         │              │                         │
-    └─────────────────────────┘              └─────────────────────────┘
-              │                                        ▲
-              │ 1. lock(amount) 🔒                     │
-              │    - Tokens bloqueados                 │
-              │    - Emite evento "Locked"             │ 3. mintRemote() 🏭
-              │                                        │    - Crea tokens en L2
-              │                                        │    - Emite evento "Minted"
-              └──────────────────┐                     │
-                                 │                     │
-                                 ▼                     │
-                        ┌─────────────────────┐        │
-                        │   🤖 RELAYER        │────────┘
-                        │                     │
-                        │ 2. Escucha "Locked" │
-                        │    Ejecuta mint     │
-                        │    en L2            │
-                        └─────────────────────┘
-
-Flujo Detallado:
-1️⃣ **Preparación**: Usuario aprueba tokens al contrato Sender en L1
-2️⃣ **Lock**: Usuario llama lock(recipientL2, amount) → tokens se bloquean
-3️⃣ **Evento**: Se emite evento "Locked" con ID único y detalles
-4️⃣ **Relayer**: Detecta evento y valida la transacción
-5️⃣ **Mint**: Relayer ejecuta mintRemote() en contrato Receiver de L2
-6️⃣ **Confirmación**: Se acuñan tokens equivalentes para el destinatario
-```
-
-## 🔐 Modo ZK (puente trustless)
-
-El puente tiene **dos modos**, elegidos con `ENABLE_ZK_PROOF_WAY` en `.env`:
-
-- **Clásico** (`false`): el relayer llama a `mintRemote()` y se **confía** en él para acuñar.
-- **ZK** (`true`): el relayer adjunta una **prueba de conocimiento cero** y el contrato
-  `ReceiverZK.release()` la **verifica on-chain** antes de acuñar. El relayer deja de ser un
-  acuñador de confianza y pasa a ser un *probador*: cualquiera con una prueba válida puede
-  liberar, pero **nadie puede acuñar sin ella**. Es el núcleo de la tesis: reemplazar
-  confianza por verificación criptográfica.
-
-### Flujo ZK
-
-```
-[Usuario] ─lock()→ [Sender (N1)] ─emit Locked→ [Relayer]
-                                                   │  (arma inputs, corre el circuito)
-                                                   ▼
-                                          [Noir Engine (off-chain)] → ZK-proof
-                                                   │  (proof + inputs públicos)
-                                                   ▼
-                            [ReceiverZK.release() (N2)] → [TxInclusionVerifier.sol] ✓
-                                                   │
-                                                   ▼  si la prueba es válida: mint → fondos liberados
-```
-
-### ¿Dónde se usa la ZK?
-
-- **Generación — off-chain (relayer):** el circuito Noir compilado + `bb.js` arman la prueba
-  (`relayer/prover.js`). Es la parte pesada del ZK.
-- **Verificación — on-chain (N2):** `TxInclusionVerifier.sol` (verificador UltraHonk que genera
-  `bb`, ~17 KB) valida la prueba dentro de `release()`, que **revierte si no es válida**.
-
-### Qué prueba el circuito
-
-- **Circuito MPT** (`noir-merkle`) — *verificación de transacciones*: demuestra que la tx `lock`
-  está **incluida** en un bloque (bajo el `transactionsRoot`). **Es el que corre hoy.**
-- **Circuito BLS** (`zk-bridge-zero`) — *verificación de firmas*: demuestra que el sync committee
-  de Ethereum **firmó** ese bloque (finalidad). **Fase 4, aún no conectado.**
-
-### Componentes ZK
-
-| Componente | Rol |
+| Término | Qué significa acá |
 |---|---|
-| `noir-merkle` (circuito MPT) | Genera el ACIR; prueba inclusión de la tx |
-| `relayer/prover.js` | Corre el circuito (NoirJS + bb.js) → `{proof, publicInputs}` |
-| `contracts/verifiers/TxInclusionVerifier.sol` | Verificador UltraHonk on-chain (lo genera `bb`) |
-| `contracts/RootRegistry.sol` | Registro (temporal) de `transactionsRoot` confiables |
-| `contracts/ReceiverZK.sol` | `release()`: verifica la prueba + anti-replay → acuña |
-| `relayer/relayer-zk.js` | Escucha `Locked`, obtiene la prueba y llama a `release()` |
-| `scripts/generate-verifiers.sh` (`npm run circuits:mpt`) | Genera el verificador + copia el ACIR |
+| L1 / L2 | La cadena de origen (N1, simulada con Hardhat) y la de destino (N2, simulada con Anvil) del puente |
+| Lock-and-mint | Patrón del puente: el token se bloquea en origen y se acuña un equivalente en destino, no se mueve literalmente |
+| Relayer | Servicio que escucha eventos en una cadena y dispara la transacción correspondiente en la otra |
+| Prover / prueba ZK | Quien genera la prueba de conocimiento cero — acá, que demuestra que una tx de `lock` está incluida en un bloque real, sin revelar todo su contenido |
+| Verificador (verifier) | Contrato on-chain que valida una prueba ZK y solo deja pasar la operación si es válida |
+| Trustless | Que la seguridad no depende de confiar en un actor (el relayer), sino de la verificación criptográfica |
+| RootRegistry | Registro temporal de `transactionsRoot` confiables, mientras no esté la prueba BLS que reemplaza esa confianza (fase 4) |
+| ACIR / circuito | Lo que compila Noir a partir del código del circuito (`.nr`); es lo que el prover ejecuta y el verificador valida |
 
-### Estado actual (honesto)
+## Contratos por red y modo
 
-- ✅ **Fases 1–2 — funciona end-to-end, con prueba real de cada lock:** lock en N1 →
-  `relayer/buildRawCase.js` arma la MPT proof del bloque real (ya no un fixture) →
-  `relayer/prover.js` genera la prueba ZK → **verificación on-chain** → mint en N2. El
-  verificador es real (rechaza pruebas adulteradas), con anti-replay.
-- ✅ **Fase 3 — binding de `(recipient, amount)` implementado, desplegado y probado en vivo:**
-  el circuito (`circuits/fase3/`) ata `(to, amount)` al calldata del `lock()` incluido en el
-  bloque; `ReceiverZKBoundBLS` (deploy con `USE_BLS=1`) exige que coincidan con la prueba →
-  **no se puede adulterar la transferencia**. Test: `test/ReleaseZKBound.test.js`; demo de
-  ataque: `scripts/attackDemo.js`.
-- ⏳ **Fase 4 — trustless completo (pendiente):** (1) binding de `to == Sender` (falta parsear
-  el `to` de la tx desde el RLP para atarlo también); (2) firma **BLS real** (hoy `sigVerifier`
-  es un stub que devuelve `true`) para reemplazar el `RootRegistry` confiable.
+| Contrato | Red | Modo | Qué hace |
+|---|---|---|---|
+| `GuaraniToken` | N1 y N2 | Ambos | ERC-20 (GUA) con mint/burn por roles |
+| `Sender` | N1 | Ambos | `lock(to, amount)`: bloquea GUA y emite `Locked(id, from, to, amount)` |
+| `Receiver` | N2 | Clásico | `mintRemote(...)`, protegido por `onlyRelayer` + anti-replay |
+| `RootRegistry` | N2 | ZK | Registro de `transactionsRoot` confiables (temporal, hasta fase 4) |
+| `TxInclusionVerifier` | N2 | ZK | Verificador UltraHonk del circuito MPT, generado por `bb` |
+| `ReceiverZK` / `ReceiverZKBound` / `ReceiverZKBoundBLS` | N2 | ZK | `release()`: verifica la prueba (las variantes *Bound* además atan `recipient`/`amount`) y acuña |
+| `SignatureVerifierStub` | N2 | ZK (fase 4, stub) | Reemplazo temporal del verificador BLS: siempre devuelve `true` |
 
-> Diseño completo y fases en **`docs/INTEGRACION_ZK.md`**. Arranque y pruebas en **`docs/RUN.md`**.
+---
 
-## 🔧 Componentes Técnicos
+## Flujo sin ZK (puente clásico)
 
-### Contratos Inteligentes
-
-- **`GuaraniToken.sol`**: Token ERC20 con funcionalidad de mint/burn y roles
-- **`Sender.sol`**: Contrato en L1 que bloquea tokens y emite eventos
-- **`Receiver.sol`**: Contrato en L2 que acuña tokens tras verificación
-- **`Verifier.sol`**: (Opcional) Verificación criptográfica adicional
-
-### Infraestructura
-
-- **Relayer**: Servicio Node.js que monitorea eventos y ejecuta transferencias
-- **Frontend**: Interfaz web para interactuar con el puente
-- **Testing**: Suite completa de tests para validar funcionalidad
-
-## 🛡️ Seguridad
-
-- **Nonce System**: Cada transferencia tiene un ID único incremental
-- **Replay Protection**: Mapping de transacciones procesadas previene duplicados
-- **Role-Based Access**: Solo el relayer autorizado puede acuñar tokens
-- **Event Validation**: Verificación completa de eventos antes del procesamiento
-
-## 🚀 Guía de Setup Completa (Desde Cero)
-
-### ⚠️ Importante: Setup Paso a Paso
-
-Para evitar errores comunes como "Contract not found", sigue **exactamente** estos pasos en orden:
-
-### Prerrequisitos
-
-- Node.js v18+
-- npm o yarn  
-- Docker & Docker Compose (Recomendado)
-- MetaMask u otro wallet compatible
-
-### 🐳 Método Recomendado: Docker Compose
-
-#### 1️⃣ Clonar y preparar el proyecto
-
-```bash
-git clone <repository-url>
-cd guarani-bridge
-
-# Configuración: el .env controla el modo del puente
-cp .env.example .env
+```
+    L1  ·  Hardhat  (chain N1)                   L2  ·  Anvil  (chain N2)
+    ┌─────────────────────────┐                  ┌─────────────────────────┐
+    │   GuaraniToken (ERC20)  │                  │   GuaraniToken (ERC20)  │
+    │     Sender Contract     │                  │    Receiver Contract    │
+    └────────────┬────────────┘                  └────────────▲────────────┘
+                 │                                            │
+                 │ 1. lock(recipientL2, amount)               │ 3. mintRemote(id, to, amount)
+                 │    GUA bloqueado en L1                     │    GUA acuñado en L2
+                 │    emite evento "Locked"                   │    emite evento "Minted"
+                 │                                            │
+                 └──────────────┐                             │
+                                 ▼                            │
+                         ┌───────────────┐
+                         │    RELAYER    │────────────────────┘
+                         │   2. Escucha  │
+                         │    "Locked"   │
+                         └───────────────┘
 ```
 
-En `.env`, el switch **`ENABLE_ZK_PROOF_WAY`** elige el modo:
-- `true`  → flujo **ZK** (`ReceiverZK.release()` verifica una prueba on-chain)
-- `false` → flujo **clásico** (`Receiver.mintRemote()`, relayer de confianza)
-
-Solo para el modo **ZK** (una vez, requiere `nargo` + `bb` instalados): generar el
-verificador Solidity y el ACIR del circuito. En modo clásico, salteá esto.
-
-```bash
-npm run circuits:mpt
-```
-
-#### 2️⃣ Levantar servicios base
-
-```bash
-# Construir todas las imágenes
-docker compose build
-
-# Iniciar L1 (Hardhat) y L2 (Anvil)
-docker compose up -d hardhat-n1 anvil-n2
-
-# Verificar que están saludables (IMPORTANTE)
-docker compose ps
-# Debe mostrar hardhat-n1 como "healthy"
-```
-
-#### 3️⃣ Desplegar + generar config (CRÍTICO — un solo comando)
-
-```bash
-docker compose run --rm -e USE_BLS=1 deployer bash scripts/docker-deploy.sh
-```
-
-`USE_BLS=1` es solo para modo ZK — despliega `ReceiverZKBoundBLS` (Fase 3+4, ata
-`(recipient, amount)` a la prueba). Sin esa variable cae a `ReceiverZK` (Fase 1, sin ese
-binding). En modo clásico no aplica.
-
-Según `ENABLE_ZK_PROOF_WAY`, este script:
-- despliega N1 (GuaraniToken + Sender) y N2 (contratos ZK o Receiver clásico),
-- escribe `deploy-N1.json` y `deploy-N2*.json`,
-- **regenera `public/config.js`** con las direcciones y el modo (lo que consume el frontend).
-
-> ⚠️ **Cada vez que reinicies las cadenas** (`down`/`up` o `restart` de los nodos) quedan
-> vacías: **volvé a correr este comando**. Redepliega y reescribe el config; si no, el
-> frontend queda apuntando a contratos inexistentes ("Contract not found").
-
-#### 4️⃣ (Opcional) mintear a otra cuenta
-
-La cuenta #0 (`0xf39F…92266`) ya tiene 1.000.000 GUA en N1 tras el deploy. Si querés usar
-otra cuenta en MetaMask, minteale:
-
-```bash
-docker compose run --rm -e MINT_TO=0xTU_CUENTA deployer \
-  npx hardhat run scripts/mintTo.js --network dockerN1
-```
-
-#### 5️⃣ Iniciar servicios adicionales
-
-```bash
-# Iniciar el relayer
-docker compose up -d relayer
-
-# Iniciar el frontend (opcional)
-docker compose up -d frontend
-
-# Verificar que todo esté corriendo
-docker compose ps
-```
-
-#### 6️⃣ Acceder a la aplicación
-
-- **Frontend**: http://localhost:3000
-- **L1 RPC**: http://localhost:8545 
-- **L2 RPC**: http://localhost:9545
-
-### 🔧 Configuración de MetaMask
-
-1. Agregar red L1 (Hardhat):
-   - **Network Name**: Hardhat Local
-   - **RPC URL**: http://localhost:8545
-   - **Chain ID**: 31337
-   - **Currency Symbol**: ETH
-
-2. Agregar red L2 (Anvil):
-   - **Network Name**: Anvil Local  
-   - **RPC URL**: http://localhost:9545
-   - **Chain ID**: 1338
-   - **Currency Symbol**: ETH
-
-3. Importar la cuenta #0 (tiene 1.000.000 GUA en N1 tras el deploy):
-   - **Private Key**: `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
-   - **Dirección**: `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`
-
-4. **Tras cada reinicio de cadena**, reseteá el nonce que MetaMask cachea:
-   Configuración → Avanzado → **Borrar datos de la pestaña de actividad**. Si no, las
-   transacciones fallan con "transacción fallida" aunque tengas saldo. Refrescá la página
-   con `Cmd+Shift+R` para tomar el `config.js` nuevo.
-
-### 🎯 Usar el puente (frontend)
-
-En **http://localhost:3000**: conectá MetaMask (cuenta #0, red 31337), poné la **dirección
-destino** y el **monto**, y tocá **Bridge**. El `lock` ocurre en N1; el relayer detecta el
-evento, y en **modo ZK** genera la prueba y llama a `release()` (el verificador la valida
-on-chain) mientras en **modo clásico** acuña con `mintRemote()`. El badge arriba (🔒 ZK /
-🤝 clásico) indica el modo activo, y vas a ver el evento de N2 (`Released`/`Minted`) en el log.
-
-### 🚨 Troubleshooting Común
-
-#### Problema: "Contract not found" en el frontend
-
-**Causa**: Los contratos no están desplegados o los servicios se reiniciaron.
-
-**Solución**:
-```bash
-# 1. Verificar que los servicios estén corriendo
-docker compose ps
-
-# 2. Redesplegar (usa el script que respeta ENABLE_ZK_PROOF_WAY, no los deploy
-#    scripts sueltos — esos ignoran el modo y pueden desplegar el receiver
-#    equivocado)
-docker compose run --rm -e USE_BLS=1 deployer bash scripts/docker-deploy.sh
-
-# 3. Reiniciar relayer y frontend
-docker compose restart relayer frontend
-```
-
-#### Problema: "Internal JSON-RPC error" en transacciones
-
-**Causa**: Problemas de nonce o falta de tokens.
-
-**Solución**:
-```bash
-# Mintear tokens a tu cuenta
-docker compose run --rm deployer node scripts/mintToFrontendAccount.js
-```
-
-#### Problema: Relayer no procesa eventos
-
-**Causa**: Error en el listener de eventos.
-
-**Solución**:
-```bash
-# Ver logs del relayer
-docker logs guarani-relayer --tail 20
-
-# Reiniciar relayer
-docker compose restart relayer
-```
-
-### ⚡ Reset Completo (cuando algo sale mal)
-
-```bash
-# Detener todo y limpiar volúmenes
-docker compose down -v
-
-# Reconstruir imágenes
-docker compose build --no-cache
-
-# Volver a empezar desde el paso 2
-docker compose up -d hardhat-n1 anvil-n2
-# ... continuar con los pasos de deploy
-```
-
-## 🚀 Instalación Alternativa (Sin Docker)
-
-### Prerrequisitos
-
-- Node.js v18+
-- npm o yarn
-- MetaMask u otro wallet compatible
-
-### 1️⃣ Instalar dependencias
-
-```bash
-npm install
-```
-
-### 2️⃣ Arrancar cadenas locales
-
-Necesitas **dos terminales** para ejecutar ambas cadenas:
-
-```bash
-# Terminal 1 - L1 (Hardhat)
-npm run node:n1   # Puerto 31337
-
-# Terminal 2 - L2 (Anvil)
-npm run node:n2   # Puerto 1338
-```
-
-### 3️⃣ Compilar y desplegar contratos
-
-```bash
-npm run compile      # Compila todos los contratos
-npm run deploy:n1    # Despliega en L1 (Hardhat)
-npm run deploy:n2    # Despliega en L2 (Anvil)
-```
-
-Los archivos `deploy-N1.json` y `deploy-N2.json` contendrán las direcciones de los contratos desplegados.
-
-### 4️⃣ Configurar Frontend
-
-`public/config.js` (lo que lee el frontend) se **autogenera** — no se edita a mano:
-
-```bash
-npm run config       # genera public/config.js desde deploy-N1.json/deploy-N2*.json
-npm run frontend     # Abre http://localhost:3000
-```
-
-### 5️⃣ Iniciar Relayer
-
-```bash
-npm run relayer      # Inicia el servicio de relaying
-```
-
-## 🐳 Información Adicional de Docker
+El usuario aprueba tokens al contrato `Sender` en N1 y llama `lock(recipientL2, amount)`, que
+bloquea el GUA y emite `Locked` con un id único. El relayer escucha ese evento y llama
+`mintRemote(id, to, amount)` en el `Receiver` de N2, que acuña el equivalente. La seguridad acá
+depende de confiar en que el relayer no acuñe nada que no corresponda a un lock real — no hay
+ninguna prueba criptográfica de por medio.
 
 ### Requisitos
 
-- Docker 20.10+
-- Docker Compose 2.0+
+- Docker y Docker Compose.
+- MetaMask (u otra wallet EVM) para operar desde el navegador.
+- Node.js solo si vas a correr algún script suelto fuera de Docker (por ejemplo, mintear a otra cuenta).
 
-### Detalles de la Arquitectura
-
-Docker Compose gestiona automáticamente:
-- **L1 (Hardhat)**: Red local en puerto 8545
-- **L2 (Anvil)**: Red local en puerto 9545
-- **Relayer**: Servicio que sincroniza ambas redes
-- **Frontend**: Interfaz web en puerto 3000
-
-### Configuración Avanzada
-
-#### Variables de Entorno
-
-Puedes personalizar el comportamiento creando un archivo `.env`:
+### Levantar en redes locales
 
 ```bash
-# .env
-RPC_URL_N1=http://hardhat-n1:8545
-RPC_URL_N2=http://anvil-n2:9545
-START_BLOCK_N1=0
-NODE_OPTIONS=--max-old-space-size=2048
+cp .env.example .env
+# dejá ENABLE_ZK_PROOF_WAY=false
+
+docker compose build
+docker compose up -d hardhat-n1 anvil-n2
+
+# despliega GuaraniToken + Sender en N1, Receiver clásico en N2, y genera public/config.js
+docker compose run --rm deployer bash scripts/docker-deploy.sh
+
+docker compose up -d relayer frontend
 ```
 
-### Comandos Útiles para Desarrollo
+Frontend en http://localhost:3000. Cada vez que reiniciás `hardhat-n1`/`anvil-n2` los contratos
+se pierden — volvé a correr `docker-deploy.sh` antes de seguir usando el puente.
+
+### Usar testnet
+
+El `docker-compose.yml` de hoy tiene el relayer apuntando fijo a los hostnames internos del
+stack (`http://hardhat-n1:8545`, `http://anvil-n2:9545`), así que el camino más directo para
+testnet es correr el deploy y el relayer **fuera de Docker**, leyendo el `.env`:
 
 ```bash
-# Ver estado de todos los servicios
-docker compose ps
-
-# Ver logs en tiempo real
-docker compose logs -f
-
-# Logs de un servicio específico
-docker compose logs -f hardhat-n1
-docker compose logs -f anvil-n2
-docker compose logs -f relayer
-
-# Verificar que los contratos existen
-curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_getCode","params":["DIRECCION_CONTRATO","latest"],"id":1}' http://localhost:8545
-
-# Ejecutar comando en un contenedor
-docker compose exec hardhat-n1 bash
-
-# Mintear tokens de prueba
-docker compose run --rm deployer npx hardhat run scripts/mintTokens.js --network dockerN1
-
-# Detener servicios
-docker compose stop
-
-# Detener y eliminar (limpia volúmenes)
-docker compose down -v
-
-# Reconstruir imágenes (después de cambios)
-docker compose build --no-cache
-
-# Reset completo del proyecto
-docker compose down -v && docker compose build --no-cache && docker compose up -d
+# .env — RPC reales y una cuenta financiada por faucet (nunca la mnemonic de test)
+RPC_URL_N1=https://sepolia.infura.io/v3/<TU_KEY>
+RPC_URL_N2=<RPC de la L2 testnet que elijas>
+PRIVATE_KEY_DEPLOYER=<private key financiada>
+PRIVATE_KEY_RELAYER=<private key financiada>
 ```
 
-### Verificación del Deployment
-
-Después de seguir los pasos, verifica que todo funcione:
+`hardhat.config.js` ya tiene las redes `sepolia` y `opSepolia` (leen esas mismas variables):
 
 ```bash
-# 1. Verificar servicios activos
-docker compose ps
-# Debe mostrar: hardhat-n1 (healthy), anvil-n2 (running), relayer (running), frontend (running)
+npm run deploy:n1:testnet    # Sepolia
+npm run deploy:n2:testnet    # L2 testnet, Receiver clásico
+npm run config                # regenera public/config.js
 
-# 2. Verificar archivos de deploy
-cat deploy-N1.json
-cat deploy-N2.json
-# Deben contener direcciones de contratos
-
-# 3. Verificar contratos en L1
-curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_getCode","params":["$(cat deploy-N1.json | jq -r .token)","latest"],"id":1}' http://localhost:8545 | jq -r .result
-# Debe devolver código del contrato (no "0x")
-
-# 4. Probar el frontend
-# Ir a http://localhost:3000
-# Las tablas deben mostrar balances de ETH (no "Contract not found")
+npm run relayer
+npm run frontend
 ```
 
-### Archivos Docker
+En una testnet real los bloques no son instantáneos ni tienen auto-mining como en local, y
+puede haber reorgs — a diferencia de local, acá conviene que el relayer espere unas
+confirmaciones antes de dar un `Locked` por válido.
 
-- **`Dockerfile`**: Imagen base con Node.js, dependencias y contratos compilados
-- **`Dockerfile.anvil`**: Imagen con Foundry/Anvil para L2
-- **`docker-compose.yml`**: Orquestación de servicios y networking
-- **`.dockerignore`**: Archivos excluidos del build
+---
 
-## 💡 Uso
+## Flujo con ZK (Noir)
 
-### ⚠️ Antes de usar, asegúrate de:
+```
+    ┌─────────┐             ┌─────────────┐                  ┌─────────┐
+    │ Usuario │ ──lock()──▶ │ Sender · N1 │ ──emit Locked──▶ │ Relayer │
+    └─────────┘             └─────────────┘                  └─────────┘
+                   ┌──────────────────────────────────────────────┘
+                   │  arma los inputs y corre el circuito
+                   ▼
+    ┌─────────────────────────────┐
+    │ Circuito Noir  ·  off-chain │
+    └─────────────────────────────┘
+                   │
+                   │  proof + public inputs
+                   ▼
+    ┌─────────────────────────────┐               ┌─────────────────────────┐
+    │ ReceiverZK.release()  ·  N2 │ ──verifica──▶ │ TxInclusionVerifier.sol │
+    └─────────────────────────────┘               └─────────────────────────┘
+                 ┌─────────────────────────────────────────────┘
+                 │  si la prueba es válida
+                 ▼
+    ┌─────────────────────────┐
+    │ mint → fondos liberados │
+    └─────────────────────────┘
+```
 
-1. ✅ Haber seguido la "Guía de Setup Completa" anterior
-2. ✅ Todos los servicios Docker estén corriendo
-3. ✅ Los contratos estén desplegados (deploy-N1.json y deploy-N2.json existen)
-4. ✅ El relayer esté activo y sin errores
+El `lock()` en N1 es igual que en el flujo clásico. La diferencia está en N2: en vez de confiar
+en que el relayer acuñe correctamente, el relayer genera una prueba de que el `lock` está
+incluido en un bloque real (circuito MPT de `noir-merkle`) y se la pasa a
+`ReceiverZK.release()`, que la verifica on-chain antes de acuñar. Si la prueba es inválida, o no
+corresponde a ese `lock`, la transacción revierte — nadie puede acuñar sin una prueba válida.
 
-### Via Frontend Web
+### Requisitos
 
-1. **Abre**: http://localhost:3000
-2. **Conecta MetaMask** a la red L1 (Hardhat - puerto 8545, Chain ID 31337)
-3. **Importa una cuenta con tokens** (usa la private key proporcionada arriba)
-4. **Verifica** que las tablas muestren balances (no "Contract not found")
-5. **Ingresa** la dirección de destino en L2
-6. **Especifica** la cantidad de tokens a transferir
-7. **Haz clic** en "BRIDGE →"
-8. **Confirma** en MetaMask
-9. **Espera** que el relayer procese automáticamente la transferencia
+Todo lo del flujo clásico, más:
 
-### Via Scripts
+- `nargo` (toolchain de Noir) y `bb` (Barretenberg CLI) instalados en el host. Se usan una sola
+  vez, antes del build de Docker, para generar el verificador Solidity y el ACIR del circuito.
+- Versiones que tienen que coincidir entre sí — si no matchean, la prueba no verifica:
 
-No hay un alias `npm run script`; se corren con `hardhat run` directo, indicando la red
-(`localN1`/`localN2` en local, `dockerN1`/`dockerN2` dentro de Docker):
+  | Componente | Versión |
+  |---|---|
+  | `nargo` | `1.0.0-beta.22` |
+  | `bb` | `5.0.0-nightly.20260522` |
+  | `@noir-lang/noir_js` (npm, ya en `package.json`) | `1.0.0-beta.22` |
+  | `@aztec/bb.js` (npm, ya en `package.json`) | `5.0.0-nightly.20260522` |
+
+- El repo hermano **`noir-merkle`** (circuito MPT) solo hace falta clonarlo si vas a modificar
+  el circuito en sí. El ACIR ya compilado y el verificador Solidity generado a partir de él
+  vienen versionados en este repo (`circuits/mpt/`, `contracts/verifiers/TxInclusionVerifier.sol`).
+
+### Levantar en redes locales
 
 ```bash
-# Mintear tokens iniciales
-npx hardhat run scripts/mintTokens.js --network localN1
+cp .env.example .env
+# ENABLE_ZK_PROOF_WAY=true
 
-# Aprobar tokens al contrato Sender
-npx hardhat run scripts/approveTokens.js --network localN1
+npm run circuits:mpt          # una sola vez, necesita nargo + bb en el host
 
-# Bloquear tokens en L1
-npx hardhat run scripts/lockTokens.js --network localN1
+docker compose build
+docker compose up -d hardhat-n1 anvil-n2
 
-# Verificar balances
-npx hardhat run scripts/checkBalance.js --network localN1
+# USE_BLS=1 despliega ReceiverZKBoundBLS (fase 3+4, ata recipient/amount a la prueba).
+# Sin esa variable cae a ReceiverZK (fase 1, sin ese binding).
+docker compose run --rm -e USE_BLS=1 deployer bash scripts/docker-deploy.sh
+
+docker compose up -d relayer frontend
 ```
 
-## 🧪 Testing
+En modo ZK el relayer genera una prueba real por cada `lock` dentro del contenedor: la primera
+vez descarga el SRS (unos cientos de MB) y usa bastante RAM, por eso el servicio tiene
+`mem_limit: 6g` en el compose.
 
-Necesitan N1 y N2 corriendo (Docker o `npm run node:n1`/`node:n2`) con los contratos ya
-desplegados — no son unitarios en un chain efímero, verifican el deploy real.
+### Usar testnet
+
+Mismo mecanismo que el flujo clásico (deploy y relayer fuera de Docker, leyendo `.env`), pero
+apuntando al deploy ZK de N2:
 
 ```bash
-# Ejecutar todos los tests (Bridge + Infrastructure + NetworkDiagnostic + ZK)
-npm test
+npm run deploy:n1:testnet
+npx hardhat run scripts/deployN2-zk.js --network opSepolia
+npm run config
 
-# Tests específicos
-npm run test:bridge        # Tests del puente (lock/mint/replay, self-contenido)
-npm run test:infra         # Tests de infraestructura (contra deploy-N1.json/deploy-N2*.json reales)
-npm run test:diagnostic    # Diagnósticos de red (conectividad N1/N2, .env)
-npm run test:release       # Tests ZK (ReceiverZK, no necesita N1/N2 corriendo)
+npm run relayer:zk
+npm run frontend
 ```
 
-## 📁 Estructura del Proyecto
+La generación de la prueba (SRS + RAM) pesa igual en testnet que en local — lo único que cambia
+es el RPC al que apunta. Las mismas consideraciones de confirmaciones/reorgs del flujo clásico
+aplican acá.
+
+---
+
+## Estado del proyecto
+
+- **Fases 1-2 — funcionan end-to-end**, con prueba real de cada lock: el relayer arma la MPT
+  proof del bloque real (no un fixture), genera la prueba ZK y el verificador la valida
+  on-chain antes de acuñar.
+- **Fase 3 — binding de `(recipient, amount)`**, implementada, desplegada y probada en vivo: el
+  circuito ata esos valores al `lock()` incluido en el bloque, así que `release()` ya no acepta
+  una prueba válida de cualquier tx con cualquier destinatario o monto.
+- **Fase 4 — pendiente**: falta atar `to == Sender` parseando el RLP de la tx, y reemplazar el
+  `RootRegistry` confiable por una firma BLS real (hoy `sigVerifier` es un stub que siempre
+  devuelve `true`).
+
+El detalle completo de cada fase, con el trust model exacto de cada una, está en
+[`docs/INTEGRACION_ZK.md`](docs/INTEGRACION_ZK.md).
+
+## Consideraciones importantes
+
+- **Reiniciar una cadena borra los contratos.** Un `down`/`up` o `restart` de `hardhat-n1` o
+  `anvil-n2` deja las cadenas vacías — hay que volver a correr `docker-deploy.sh`, si no el
+  frontend queda apuntando a contratos que ya no existen ("Contract not found").
+- **MetaMask cachea el nonce por cuenta y red.** Después de reiniciar una cadena, las
+  transacciones fallan aunque haya saldo si no se borran los datos de actividad de esa red
+  (ver la sección de MetaMask).
+- **El modo del puente se elige antes del deploy.** `ENABLE_ZK_PROOF_WAY` define qué contratos
+  se despliegan en N2; cambiarlo después implica re-desplegar y recrear el relayer y el
+  frontend, no alcanza con editar el `.env`.
+- **`USE_BLS=1` (o `USE_BOUND=1`) no es opcional para el binding real.** Sin esa variable, el
+  deploy ZK cae a `ReceiverZK` (fase 1), que no ata `(recipient, amount)` a la prueba.
+- **Límite de tamaño de contrato (EIP-170, 24 KB).** El verificador Honk que genera `bb` está
+  cerca de ese límite; si el circuito crece, puede dejar de entrar.
+- **La fase 4 es honesta sobre lo que falta.** El flujo ZK actual protege contra un probador
+  que intente adulterar `(recipient, amount)`, pero todavía confía en que el `transactionsRoot`
+  registrado en el `RootRegistry` sea de un bloque real — eso es lo que la firma BLS reemplaza
+  cuando esté lista.
+
+## Configurar la billetera en MetaMask
+
+**Redes locales:**
+
+| Campo | L1 (Hardhat) | L2 (Anvil) |
+|---|---|---|
+| Nombre | Hardhat Local | Anvil Local |
+| RPC URL | http://localhost:8545 | http://localhost:9545 |
+| Chain ID | 31337 | 1338 |
+| Símbolo | ETH | ETH |
+
+Importar la cuenta de prueba (tiene 1.000.000 GUA en N1 tras el deploy):
+
+- **Private key**: `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
+- **Dirección**: `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`
+
+**Redes testnet:** Sepolia ya viene precargada en MetaMask (activarla en Configuración →
+Avanzado → "Mostrar redes de test"). La L2 testnet que elijas para N2 (por ejemplo OP Sepolia,
+chain ID `11155420`) probablemente haya que agregarla a mano con su RPC público o el de tu
+proveedor. Para operar necesitás una cuenta con fondos de faucet en ambas redes, no la cuenta
+de prueba de arriba.
+
+**Después de cada reinicio de cadena local**, hay que resetear el nonce que MetaMask cachea:
+Configuración → Avanzado → **Borrar datos de la pestaña de actividad**. Si no, las
+transacciones fallan con "transacción fallida" aunque haya saldo. Conviene refrescar la página
+del frontend con `Cmd+Shift+R` para tomar el `config.js` nuevo.
+
+---
+
+## Estructura del proyecto
 
 ```
 guarani-bridge/
-├── contracts/           # Contratos Solidity
-├── scripts/            # Scripts de deployment y utilidades
-├── test/              # Suite de tests
-├── relayer/           # Servicio relayer
-├── public/            # Frontend web
-├── utils/             # Utilidades compartidas
-└── artifacts/         # Contratos compilados
+├── contracts/          # Contratos Solidity (puente + verificadores ZK)
+├── circuits/           # ACIR de los circuitos Noir
+├── scripts/            # Deploy y utilidades
+├── test/               # Tests
+├── relayer/            # Servicio relayer (clásico y ZK)
+├── public/              # Frontend web
+├── utils/               # Utilidades compartidas
+└── docs/                # Diseño ZK por fases (INTEGRACION_ZK.md) y guía de arranque (RUN.md)
+```
+
+## Testing
+
+Necesitan N1 y N2 corriendo (Docker o `npm run node:n1`/`node:n2`) con los contratos ya
+desplegados — no son tests unitarios en una chain efímera, verifican el deploy real.
+
+```bash
+npm test                   # Bridge + Infrastructure + NetworkDiagnostic + ZK
+npm run test:bridge        # lock/mint/replay
+npm run test:infra         # contra deploy-N1.json/deploy-N2*.json reales
+npm run test:release       # ReceiverZK, no necesita N1/N2 corriendo
 ```
