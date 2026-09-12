@@ -139,7 +139,14 @@ async function handleLocked(id, from, to, amount, ev) {
 // Hardhat, y procesa también eventos pasados (desde START_BLOCK_N1) → no se pierde
 // ningún lock aunque el relayer arranque después.
 const POLL_MS = Number(process.env.POLL_MS || 3000);
-let nextBlock = Number(process.env.START_BLOCK_N1 || 0);
+// Sin START_BLOCK_N1 explícito, arrancar desde el bloque actual — no desde 0.
+// En local (Hardhat, chain corta) escanear desde 0 es gratis; en una red real
+// (Sepolia, con millones de bloques) intentar traer Locked() desde el génesis
+// hace que el RPC rechace la consulta.
+const defaultStartN1 = async () => (await providerN1.getBlockNumber()) + 1;
+let nextBlock = Number(process.env.START_BLOCK_N1) > 0
+  ? Number(process.env.START_BLOCK_N1)
+  : await defaultStartN1();
 let lastHead = -1; // último head observado; sirve para distinguir "esperando bloque nuevo" de "la cadena retrocedió"
 let busy = false;
 
@@ -155,7 +162,9 @@ async function poll() {
     // normal (esperando el próximo bloque) head == nextBlock - 1 siempre.
     if (lastHead !== -1 && head < lastHead) {
       console.log(`🔄 N1 retrocedió (head=${head} < último visto=${lastHead}), reseteando cursor`);
-      nextBlock = Number(process.env.START_BLOCK_N1 || 0);
+      nextBlock = Number(process.env.START_BLOCK_N1) > 0
+        ? Number(process.env.START_BLOCK_N1)
+        : head + 1;
     }
     lastHead = head;
     if (head >= nextBlock) {

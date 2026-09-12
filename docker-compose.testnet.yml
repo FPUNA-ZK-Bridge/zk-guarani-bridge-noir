@@ -1,0 +1,38 @@
+# Variante de docker-compose para testnet real (Sepolia / OP Sepolia).
+# No levanta hardhat-n1/anvil-n2 — el relayer y el frontend apuntan directo
+# a las RPC reales que pongas en .env (RPC_URL_N1 / RPC_URL_N2).
+#
+# Uso:
+#   npm run deploy:n1:testnet
+#   npm run deploy:n2:testnet   # o deployN2-zk.js --network opSepolia para ZK
+#   npm run config
+#   docker compose -f docker-compose.testnet.yml up -d --build
+services:
+  relayer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: guarani-relayer-testnet
+    command: ["bash", "relayer/docker-entrypoint.sh"]
+    mem_limit: 6g
+    environment:
+      - NODE_ENV=production
+      - RPC_URL_N1=${RPC_URL_N1}
+      - RPC_URL_N2=${RPC_URL_N2}
+      - PRIVATE_KEY_RELAYER=${PRIVATE_KEY_RELAYER}
+      - ENABLE_ZK_PROOF_WAY=${ENABLE_ZK_PROOF_WAY:-false}
+      - START_BLOCK_N1=${START_BLOCK_N1:-0}
+      - NODE_OPTIONS=--max-old-space-size=4096
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: guarani-frontend-testnet
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./public:/app/public

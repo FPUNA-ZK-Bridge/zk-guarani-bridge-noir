@@ -1,1116 +1,703 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <title>GuaraniToken • Local Bridge Demo</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta charset="utf-8" />
+<title>Ñandutí Bridge</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 
-  <!-- Ethers v6 (UMD)  → no CORS issues -->
-  <script src="https://unpkg.com/ethers@6.11.1/dist/ethers.umd.min.js"></script>
+<script src="https://unpkg.com/ethers@6.11.1/dist/ethers.umd.min.js"></script>
 
-  <link rel="preconnect" href="https://fonts.gstatic.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="ds/organic.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-  <style>
-    :root {
-      --primary: #6200ee;
-      --primary-dark: #3700b3;
-      --bg: #fafafa;
-      --surface: #fff;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; font-family: Roboto, sans-serif; background: var(--bg); color:#222;
-      display:flex; flex-direction:column; align-items:center;
-    }
-    h1 { font-size:1.7rem; font-weight:400; margin:1.3rem 0 .5rem; color:var(--primary); }
-    .card {
-      width:100%; max-width:420px; background:var(--surface); border-radius:8px;
-      box-shadow:0 2px 8px rgba(0,0,0,.08); padding:24px; margin:1rem;
-    }
-    label { display:block; font-size:.85rem; margin-bottom:4px; opacity:.8; }
-    input {
-      width:100%; padding:10px 14px; border:1px solid #ccc; border-radius:4px;
-      font-size:.95rem; margin-bottom:16px; transition:border-color .2s;
-    }
-    input:focus { outline:none; border-color:var(--primary); }
-    button {
-      display:block; width:100%; background:var(--primary); color:#fff;
-      border:none; border-radius:4px; padding:12px; font-size:.9rem;letter-spacing:.5px;
-      cursor:pointer; transition:background .2s,box-shadow .2s;
-    }
-    button:hover { background:var(--primary-dark); box-shadow:0 4px 10px rgba(0,0,0,.18); }
-    pre { background:#111; color:#0f0; border-radius:4px; padding:12px; height:160px; overflow:auto; white-space:pre-wrap; font-family:monospace; font-size:.77rem; margin-top:20px; }
-    
-    /* Estilos para las tablas de monitoreo */
-    .monitor-section { margin-top: 2rem; }
-    .monitor-tables { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
-    .table-container { flex: 1; min-width: 600px; max-width: 800px; }
-    .table-title { text-align: center; font-size: 1.1rem; font-weight: 500; color: var(--primary); margin-bottom: 0.5rem; }
-    .balance-table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.08); table-layout: fixed; }
-    .balance-table th, .balance-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #eee; word-wrap: break-word; }
-    .balance-table th:first-child, .balance-table td:first-child { width: 60%; }
-    .balance-table th:nth-child(2), .balance-table td:nth-child(2) { width: 20%; }
-    .balance-table th:nth-child(3), .balance-table td:nth-child(3) { width: 20%; }
-    .balance-table th { background: #f5f5f5; font-weight: 500; font-size: 0.85rem; }
-    .balance-table td { font-size: 0.8rem; }
-    .balance-table tr:hover { background: #f9f9f9; }
-    .address { color: #666; }
-    .balance { font-weight: bold; color: var(--primary); }
-    .contract-info { background: var(--surface); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
-    .contract-info h3 { margin: 0 0 0.5rem; color: var(--primary); font-size: 1rem; }
-    .contract-address { font-family: monospace; font-size: 0.85rem; color: #666; word-break: break-all; }
-    .refresh-btn { background: #28a745; padding: 6px 12px; border-radius: 4px; border: none; color: white; font-size: 0.8rem; cursor: pointer; margin-bottom: 1rem; }
-    .refresh-btn:hover { background: #218838; }
-  </style>
+<style>
+  body { min-height: 100vh; padding-bottom: 44px; transition: background .3s ease, color .3s ease; }
+  a { color: var(--color-accent-700); text-decoration: none; }
+  a:hover { color: var(--color-accent-600); }
+  .mono { font-family: 'Roboto Mono', monospace; }
+  @keyframes ndHalo { 0% { r: 13; opacity: .55 } 100% { r: 30; opacity: 0 } }
+  @keyframes ndSpin { to { transform: rotate(360deg) } }
+  @keyframes ndWeave { 0% { transform: scale(0) rotate(-120deg); opacity: 0 } 60% { opacity: 1 } 100% { transform: scale(1) rotate(0deg); opacity: 1 } }
+  @keyframes ndDash { to { stroke-dashoffset: -56 } }
+  @keyframes ndBloom { 0% { transform: scale(.94); opacity: .45 } 55% { transform: scale(1.04) } 100% { transform: scale(1); opacity: 1 } }
+  @keyframes ndFlash { 0% { background: transparent } 25% { background: var(--color-accent-2-200) } 100% { background: transparent } }
+  @keyframes ndBreathe { 0%, 100% { opacity: .5 } 50% { opacity: .85 } }
+  @keyframes ndTravel { from { transform: translateX(0) } to { transform: translateX(240px) } }
+
+  header.nd { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 40px; border-bottom: 1px solid var(--color-divider); }
+  .nd-brand { display: flex; align-items: center; gap: 14px; }
+  .nd-brand-text { display: flex; flex-direction: column; gap: 1px; }
+  .nd-brand-text .name { font-family: var(--font-heading); font-size: 21px; line-height: 1.1; }
+  .nd-brand-text .sub { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-600); }
+  .nd-right { display: flex; align-items: center; gap: 14px; }
+  .pill-btn { display: flex; align-items: center; gap: 11px; border: 1px solid var(--color-divider); background: var(--color-neutral-100); cursor: pointer; font: inherit; padding: 7px 16px; border-radius: 999px; color: var(--color-text); }
+  .pill-btn:hover { background: var(--color-neutral-200); }
+  .pill-label { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--color-neutral-700); }
+  .wallet-chip { display: flex; align-items: center; gap: 9px; padding: 8px 16px; border-radius: 999px; background: var(--color-surface); font-size: 12px; }
+  .dot { width: 7px; height: 7px; border-radius: 999px; }
+
+  .nd-grid { display: grid; grid-template-columns: 396px minmax(0, 1fr); gap: 26px; max-width: 1580px; margin: 0 auto; padding: 26px 40px; align-items: start; }
+  @media (max-width: 900px) { .nd-grid { grid-template-columns: 1fr; padding: 20px; } }
+  .col { display: flex; flex-direction: column; gap: 20px; }
+
+  .kicker { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--color-accent-700); }
+  h1.nd-h1 { font-size: 30px; line-height: 1.08; margin: 6px 0 4px; }
+  .nd-lead { margin: 0 0 20px; font-size: 13.5px; line-height: 1.5; color: var(--color-neutral-700); }
+
+  .field-row { display: grid; grid-template-columns: minmax(0, 1fr) 72px; gap: 10px; }
+  .token-badge { display: flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--color-accent-200); color: var(--color-accent-800); font-weight: 700; font-size: 13px; }
+  .hint-row { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
+  .between-row { display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: space-between; margin-top: 8px; font-size: 11.5px; color: var(--color-neutral-600); }
+
+  .cta { position: relative; overflow: hidden; font-size: 15px; padding: 13px 20px; }
+  .cta-pulse { position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(249,244,237,.42), transparent); width: 40%; display: none; }
+  .cta.running .cta-pulse { display: block; animation: ndTravel 1.4s linear infinite; }
+
+  .warn-box { display: flex; gap: 10px; margin-top: 16px; padding: 12px 14px; border-radius: var(--radius-md); background: var(--color-accent-200); align-items: flex-start; }
+  .warn-box .bang { font-family: var(--font-heading); font-size: 15px; color: var(--color-accent-800); }
+  .warn-box p { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--color-accent-900); }
+
+  .steps-card h2, .map-card h2, .bal-card h2, .detail-card h2 { font-size: 18px; margin: 0; }
+  .steps-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+  .steps-head span { font-size: 11px; color: var(--color-neutral-600); }
+  .step-row { display: grid; grid-template-columns: 26px minmax(0,1fr) auto; gap: 11px; align-items: center; padding: 9px 10px; border-radius: var(--radius-md); border: none; font: inherit; background: transparent; cursor: default; text-align: left; width: 100%; color: var(--color-text); }
+  .step-row:hover.clickable { background: var(--color-neutral-200); }
+  .step-row.selected { background: var(--color-neutral-200); }
+  .step-dot { width: 26px; height: 26px; border-radius: 999px; display: grid; place-items: center; font-size: 11.5px; font-weight: 700; background: var(--color-neutral-200); color: var(--color-neutral-600); }
+  .step-dot.active { box-shadow: 0 0 0 4px rgba(214,127,72,.22); }
+  .step-title { font-size: 13.5px; font-weight: 600; }
+  .step-sub { font-size: 11.5px; line-height: 1.35; color: var(--color-neutral-600); }
+  .step-status { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--color-neutral-500); }
+
+  .map-card { position: relative; border-radius: var(--radius-lg); background: var(--color-neutral-100); box-shadow: var(--shadow-md); padding: 18px 22px 14px; overflow: hidden; }
+  .map-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+  .map-head span { font-size: 12px; color: var(--color-neutral-600); }
+  .map-legend { display: flex; gap: 18px; flex-wrap: wrap; padding-top: 6px; border-top: 1px solid var(--color-divider); font-size: 11.5px; color: var(--color-neutral-700); margin-top: 4px; }
+  .map-legend span { display: flex; align-items: center; gap: 7px; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 999px; }
+
+  .two-col { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+  @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+  .net-block { margin-bottom: 18px; }
+  .net-block:last-child { margin-bottom: 0; }
+  .net-head { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
+  .net-chip { padding: 3px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+  .net-name { font-size: 13.5px; font-weight: 700; }
+  .net-rpc { font-size: 11px; color: var(--color-neutral-600); }
+  .flashcell { padding: 1px 4px; }
+  .flashcell.flash { animation: ndFlash .95s ease; border-radius: 6px; }
+
+  .monitor-section { max-width: 1580px; margin: 0 auto; padding: 0 40px; }
+  @media (max-width: 900px) { .monitor-section { padding: 0 20px; } }
+  .monitor-section h2 { font-size: 20px; margin: 0 0 16px; }
+  .monitor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  @media (max-width: 900px) { .monitor-grid { grid-template-columns: 1fr; } }
+  .monitor-card { padding: 20px 22px; }
+  .monitor-card .steps-head { margin-bottom: 12px; }
+  .monitor-card .table td:first-child { font-family: 'Roboto Mono', monospace; font-size: 11.5px; }
+  .monitor-card .table td:nth-child(2), .monitor-card .table td:nth-child(3) { text-align: right; white-space: nowrap; }
+
+  .detail-row { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--color-divider); }
+  .detail-row .k { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--color-neutral-600); }
+  .detail-row .v { font-size: 11.5px; word-break: break-all; }
+  .log-panel { margin-top: 16px; padding: 12px 14px; border-radius: var(--radius-md); max-height: 152px; overflow: auto; background: #2e2b25; }
+  body.dark .log-panel { background: #171514; border: 1px solid rgba(249,244,237,.12); }
+  .log-panel div { font-size: 11px; line-height: 1.7; color: var(--color-accent-2-300); }
+
+  .addr-valid { color: var(--color-accent-2-700); }
+  .addr-invalid { color: var(--color-accent-700); }
+</style>
 </head>
 <body>
-  <h1>GuaraniToken Bridge (Local)</h1>
-  <div class="card">
-    <label for="dest">Destino (L2 address)</label>
-    <input id="dest" placeholder="0x…" />
 
-    <label for="amt">Monto (GUA)</label>
-    <input id="amt" type="number" value="10" step="0.0001" />
-
-    <button id="btn-bridge">BRIDGE →</button>
-
-    <pre id="log"></pre>
-  </div>
-
-  <!-- Sección de Monitoreo de Balances -->
-  <div class="monitor-section">
-    <h2 style="text-align: center; color: var(--primary); margin-bottom: 1rem;">🔍 Monitor de Balances</h2>
-    
-    <!-- Información de Contratos -->
-    <div class="monitor-tables">
-      <div class="table-container">
-        <div class="contract-info">
-          <h3>📋 Contratos L1 (Hardhat - 31337)</h3>
-          <div>Token: <span class="contract-address" id="l1-token-addr">0x5FbDB2315678afecb367f032d93F642f64180aa3</span></div>
-          <div>Sender: <span class="contract-address" id="l1-sender-addr">0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512</span></div>
-        </div>
-      </div>
-      <div class="table-container">
-        <div class="contract-info">
-          <h3>📋 Contratos L2 (Anvil - 1338)</h3>
-          <div>Token: <span class="contract-address" id="l2-token-addr">0x8464135c8F25Da09e49BC8782676a84730C318bC</span></div>
-          <div>Receiver: <span class="contract-address" id="l2-receiver-addr">0x71C95911E9a5D330f4D621842EC243EE1343292e</span></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tablas de Balances -->
-    <div class="monitor-tables">
-      <div class="table-container">
-        <div class="table-title">🌐 L1 - Hardhat (Chain ID: 31337)</div>
-        <button class="refresh-btn" onclick="updateAllBalances()">🔄 Actualizar</button>
-        <table class="balance-table">
-          <thead>
-            <tr>
-              <th>Dirección de Cuenta</th>
-              <th>ETH</th>
-              <th>Balance GUA</th>
-            </tr>
-          </thead>
-          <tbody id="l1-balances">
-            <tr><td colspan="3">Cargando...</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="table-container">
-        <div class="table-title">⛓️ L2 - Anvil (Chain ID: 1338)</div>
-        <button class="refresh-btn" onclick="updateAllBalances()">🔄 Actualizar</button>
-        <table class="balance-table">
-          <thead>
-            <tr>
-              <th>Dirección de Cuenta</th>
-              <th>ETH</th>
-              <th>Balance GUA</th>
-            </tr>
-          </thead>
-          <tbody id="l2-balances">
-            <tr><td colspan="3">Cargando...</td></tr>
-          </tbody>
-        </table>
-      </div>
+<header class="nd">
+  <div class="nd-brand">
+    <div id="brand-mark" style="width:40px;height:40px;display:grid;place-items:center"></div>
+    <div class="nd-brand-text">
+      <span class="name">Ñandutí Bridge</span>
+      <span class="sub mono" id="mode-sub">ZK-BRIDGE UNIDIRECCIONAL</span>
     </div>
   </div>
+  <div class="nd-right">
+    <div class="pill-btn" title="El modo lo fija el deploy activo (config.js), no se puede cambiar desde acá">
+      <span class="pill-label">Modo</span>
+      <span class="mono" id="mode-label" style="font-size:11px;font-weight:700">ZK</span>
+    </div>
+    <button class="pill-btn" id="theme-toggle">
+      <span class="pill-label" id="theme-label">Claro</span>
+    </button>
+    <div class="wallet-chip mono" id="wallet-chip">
+      <span class="dot" style="background:var(--color-neutral-400)"></span>
+      <span id="wallet-addr">no conectado</span>
+    </div>
+  </div>
+</header>
+
+<div class="nd-grid">
+  <div class="col">
+    <section class="card elev-md" style="padding:24px">
+      <div class="kicker">Paso 01</div>
+      <h1 class="nd-h1">Téje tu transferencia</h1>
+      <p class="nd-lead">Bloqueás en la red de origen, el puente <span id="verb-lead">teje la prueba</span> y acuña en destino.</p>
+
+      <div class="field" style="margin-bottom:16px">
+        <label for="nd-addr">Dirección de destino en la red 2</label>
+        <input id="nd-addr" class="input mono" placeholder="0x…" spellcheck="false" style="font-size:12.5px" />
+        <div class="hint-row">
+          <span class="dot" id="addr-dot" style="background:var(--color-accent-600)"></span>
+          <span id="addr-msg" class="addr-invalid" style="font-size:11.5px">Se esperan 42 caracteres hexadecimales (0x…)</span>
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:22px">
+        <label for="nd-amt">Monto a transferir</label>
+        <div class="field-row">
+          <input id="nd-amt" class="input mono" type="number" step="0.0001" value="10" style="font-size:15px;font-weight:500" />
+          <div class="token-badge">GUA</div>
+        </div>
+        <div class="between-row mono">
+          <span id="sender-balance">Disponible — GUA</span>
+          <span>Fee: gas de red</span>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-block cta" id="cta-btn" disabled>
+        <span class="cta-pulse"></span>
+        <span id="cta-label" style="position:relative">Conectá tu wallet</span>
+      </button>
+
+      <div class="warn-box" id="classic-warn" style="display:none">
+        <span class="bang">!</span>
+        <p>Modo clásico: el relayer acuña por confianza, sin prueba criptográfica de validez.</p>
+      </div>
+    </section>
+
+    <section class="card steps-card" style="padding:22px 22px 18px">
+      <div class="steps-head">
+        <h2>Tejido del puente</h2>
+        <span class="mono" id="progress-label">en espera</span>
+      </div>
+      <div id="steps-list" style="display:flex;flex-direction:column;gap:4px"></div>
+    </section>
+  </div>
+
+  <div class="col" style="min-width:0">
+    <section class="map-card">
+      <div class="map-head">
+        <h2>Red de Ñandutí</h2>
+        <span>Tocá un nodo tejido para ver su detalle técnico</span>
+      </div>
+      <div id="map-holder" style="margin-top:4px"></div>
+      <div class="map-legend">
+        <span><span class="legend-dot" style="background:var(--color-accent-500)"></span>En proceso</span>
+        <span><span class="legend-dot" style="background:var(--color-accent-2-600)"></span>Verificado</span>
+        <span><span class="legend-dot" style="border:1.5px dashed var(--color-neutral-500)"></span>Pendiente</span>
+      </div>
+    </section>
+
+    <div class="two-col">
+      <section class="card bal-card" style="padding:20px 22px">
+        <div class="steps-head">
+          <h2>Balances en vivo</h2>
+          <span class="mono" id="refresh-label" style="font-size:10.5px">auto cada 12s</span>
+        </div>
+        <div id="balances-holder"></div>
+      </section>
+
+      <section class="card detail-card" style="padding:20px 22px">
+        <h2 id="detail-title" style="margin-bottom:12px">Detalle del nodo</h2>
+        <div id="detail-rows"></div>
+        <div class="log-panel mono" id="log-panel"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<section class="monitor-section">
+  <h2>Cuentas de la red local</h2>
+  <div class="monitor-grid">
+    <div class="card monitor-card">
+      <div class="steps-head">
+        <h3 style="margin:0">Origen L1 · <span id="mon-chain-l1" class="mono" style="font-size:11px;color:var(--color-neutral-600)">Hardhat</span></h3>
+        <button class="btn btn-ghost" id="mon-refresh-l1" style="padding:2px 10px;font-size:11px">Actualizar</button>
+      </div>
+      <table class="table">
+        <thead><tr><th>Cuenta</th><th>ETH</th><th>GUA</th></tr></thead>
+        <tbody id="mon-l1-body"><tr><td colspan="3">cargando…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="card monitor-card">
+      <div class="steps-head">
+        <h3 style="margin:0">Destino L2 · <span id="mon-chain-l2" class="mono" style="font-size:11px;color:var(--color-neutral-600)">Anvil</span></h3>
+        <button class="btn btn-ghost" id="mon-refresh-l2" style="padding:2px 10px;font-size:11px">Actualizar</button>
+      </div>
+      <table class="table">
+        <thead><tr><th>Cuenta</th><th>ETH</th><th>GUA</th></tr></thead>
+        <tbody id="mon-l2-body"><tr><td colspan="3">cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</section>
 
 <script src="config.js"></script>
 <script>
 (async () => {
-  // ───────── Config (desde public/config.js, generado por el deploy) ─────────
+  /* ═══════════════════════ config & contracts ═══════════════════════ */
   const CFG = window.CONTRACT_CONFIG || {};
-  const CHAIN_L1    = CFG.CHAIN_N1  || "0x7a69";   // 31337
-  const SENDER_L1   = CFG.SENDER_N1 || "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
-  const N2_EVENT    = CFG.N2_EVENT  || "Minted";   // 'Released' en ZK
-  const BRIDGE_MODE = CFG.MODE      || "classic";
-  // Reflejar direcciones y modo en la UI
-  const setTxt = (id, v) => { const el = document.getElementById(id); if (el && v) el.textContent = v; };
-  setTxt("l1-token-addr", CFG.TOKEN_N1);
-  setTxt("l1-sender-addr", CFG.SENDER_N1);
-  setTxt("l2-token-addr", CFG.TOKEN_N2);
-  setTxt("l2-receiver-addr", CFG.RECEIVER_N2);
-  try {
-    const h1 = document.querySelector("h1") || document.body;
-    const badge = document.createElement("span");
-    badge.textContent = BRIDGE_MODE === "zk" ? "🔒 Modo ZK" : "🤝 Modo clásico";
-    badge.style.cssText = "font-size:.8rem;padding:2px 8px;border-radius:8px;margin-left:8px;" +
-      (BRIDGE_MODE === "zk" ? "background:#0a7;color:#fff" : "background:#888;color:#fff");
-    h1.appendChild(badge);
-  } catch (_) {}
-  // ──────────────────────────────────────────────────────
+  const IS_ZK      = (CFG.MODE || "classic") === "zk";
+  const N2_EVENT   = CFG.N2_EVENT || (IS_ZK ? "Released" : "Minted");
+  const CHAIN_L1   = CFG.CHAIN_N1  || "0x7a69";
+  const TOKEN_L1   = CFG.TOKEN_N1  || "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+  const SENDER_L1  = CFG.SENDER_N1 || "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
+  const TOKEN_L2   = CFG.TOKEN_N2;
+  const RECEIVER_L2 = CFG.RECEIVER_N2;
 
-  if (!window.ethereum) return alert("Instala MetaMask");
-
-  const log = (m) => {
-    const el = document.getElementById("log");
-    el.textContent += m + "\n"; el.scrollTop = el.scrollHeight;
-  };
-
-  // En modo ZK, release() tarda (el relayer corre bb.js: 1-2 min la primera vez
-  // que baja el SRS). Sin esto el log queda mudo y parece colgado.
-  let zkWaitTimer = null;
-  const stopZkWaitTicker = () => { if (zkWaitTimer) { clearInterval(zkWaitTimer); zkWaitTimer = null; } };
-  const startZkWaitTicker = () => {
-    stopZkWaitTicker();
-    const start = Date.now();
-    log("⏳ Modo ZK: el relayer está generando la prueba (bb.js). La primera vez baja el SRS (~1-2 min); después es más rápido.");
-    zkWaitTimer = setInterval(() => {
-      const secs = Math.round((Date.now() - start) / 1000);
-      if (secs > 300) {
-        log("⚠️ Más de 5 min esperando — revisá `docker compose logs -f relayer` (puede haber revertido).");
-        return stopZkWaitTicker();
-      }
-      log(`   … generando prueba (${secs}s)`);
-    }, 15000);
-  };
-
-  /* auto-connect with error handling */
-  let provider, signer;
-  try {
-    // Check if already connected first
-    const accounts = await ethereum.request({ method: "eth_accounts" });
-    
-    if (accounts.length === 0) {
-      // Only request accounts if not already connected
-      await ethereum.request({ method: "eth_requestAccounts" });
-    }
-    
-    provider = new ethers.BrowserProvider(ethereum);
-    signer = await provider.getSigner();
-    const { chainId } = await provider.getNetwork();
-    log(`Connected ${signer.address}  (chainId ${chainId})`);
-  } catch (error) {
-    if (error.code === -32002) {
-      log("⚠️ MetaMask request already pending. Please check MetaMask and try refreshing the page.");
-      console.error("MetaMask permission request pending:", error);
-      return;
-    } else {
-      log(`❌ Connection error: ${error.message}`);
-      console.error("Connection error:", error);
-      return;
-    }
-  }
-
-    /* switch helper */
-  const switchTo = async (hexId) => {
-    const want = BigInt(parseInt(hexId, 16));     // 31337n
-    const now  = (await provider.getNetwork()).chainId; // BigInt
-    if (now !== want) {
-      try { 
-        await ethereum.request({ method:"wallet_switchEthereumChain", params:[{ chainId:hexId }] }); 
-      } catch (e) { 
-        if (e.code === -32002) {
-          log("⚠️ MetaMask request already pending. Please check MetaMask.");
-        } else {
-          log("⚠️ switch chain rejected"); 
-        }
-        throw e; 
-      }
-    }
-  };
-
-  const abiToken  = [
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "initialSupply",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "constructor"
-    },
-    {
-      "inputs": [],
-      "name": "AccessControlBadConfirmation",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
-        },
-        {
-          "internalType": "bytes32",
-          "name": "neededRole",
-          "type": "bytes32"
-        }
-      ],
-      "name": "AccessControlUnauthorizedAccount",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "spender",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "allowance",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "needed",
-          "type": "uint256"
-        }
-      ],
-      "name": "ERC20InsufficientAllowance",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "sender",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "balance",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "needed",
-          "type": "uint256"
-        }
-      ],
-      "name": "ERC20InsufficientBalance",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "approver",
-          "type": "address"
-        }
-      ],
-      "name": "ERC20InvalidApprover",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "receiver",
-          "type": "address"
-        }
-      ],
-      "name": "ERC20InvalidReceiver",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "sender",
-          "type": "address"
-        }
-      ],
-      "name": "ERC20InvalidSender",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "spender",
-          "type": "address"
-        }
-      ],
-      "name": "ERC20InvalidSpender",
-      "type": "error"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "spender",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "value",
-          "type": "uint256"
-        }
-      ],
-      "name": "Approval",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "bytes32",
-          "name": "role",
-          "type": "bytes32"
-        },
-        {
-          "indexed": true,
-          "internalType": "bytes32",
-          "name": "previousAdminRole",
-          "type": "bytes32"
-        },
-        {
-          "indexed": true,
-          "internalType": "bytes32",
-          "name": "newAdminRole",
-          "type": "bytes32"
-        }
-      ],
-      "name": "RoleAdminChanged",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "bytes32",
-          "name": "role",
-          "type": "bytes32"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "sender",
-          "type": "address"
-        }
-      ],
-      "name": "RoleGranted",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "bytes32",
-          "name": "role",
-          "type": "bytes32"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "sender",
-          "type": "address"
-        }
-      ],
-      "name": "RoleRevoked",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "from",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "value",
-          "type": "uint256"
-        }
-      ],
-      "name": "Transfer",
-      "type": "event"
-    },
-    {
-      "inputs": [],
-      "name": "DEFAULT_ADMIN_ROLE",
-      "outputs": [
-        {
-          "internalType": "bytes32",
-          "name": "",
-          "type": "bytes32"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "MINTER_ROLE",
-      "outputs": [
-        {
-          "internalType": "bytes32",
-          "name": "",
-          "type": "bytes32"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "spender",
-          "type": "address"
-        }
-      ],
-      "name": "allowance",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "spender",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "value",
-          "type": "uint256"
-        }
-      ],
-      "name": "approve",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
-        }
-      ],
-      "name": "balanceOf",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "decimals",
-      "outputs": [
-        {
-          "internalType": "uint8",
-          "name": "",
-          "type": "uint8"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "role",
-          "type": "bytes32"
-        }
-      ],
-      "name": "getRoleAdmin",
-      "outputs": [
-        {
-          "internalType": "bytes32",
-          "name": "",
-          "type": "bytes32"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "role",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
-        }
-      ],
-      "name": "grantRole",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "role",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
-        }
-      ],
-      "name": "hasRole",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        }
-      ],
-      "name": "mint",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "name",
-      "outputs": [
-        {
-          "internalType": "string",
-          "name": "",
-          "type": "string"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "role",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "address",
-          "name": "callerConfirmation",
-          "type": "address"
-        }
-      ],
-      "name": "renounceRole",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "role",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
-        }
-      ],
-      "name": "revokeRole",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes4",
-          "name": "interfaceId",
-          "type": "bytes4"
-        }
-      ],
-      "name": "supportsInterface",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "symbol",
-      "outputs": [
-        {
-          "internalType": "string",
-          "name": "",
-          "type": "string"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "totalSupply",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "value",
-          "type": "uint256"
-        }
-      ],
-      "name": "transfer",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "from",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "value",
-          "type": "uint256"
-        }
-      ],
-      "name": "transferFrom",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    }
+  const tokenAbi = [
+    "function balanceOf(address) view returns (uint256)",
+    "function allowance(address,address) view returns (uint256)",
+    "function approve(address,uint256) returns (bool)"
   ];
-  const abiSender = [
-    {
-      "inputs": [
-        {
-          "internalType": "contract GuaraniToken",
-          "name": "_token",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "constructor"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "id",
-          "type": "uint256"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "from",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        }
-      ],
-      "name": "Locked",
-      "type": "event"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "recipientL2",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        }
-      ],
-      "name": "lock",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "lockedBalance",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "nonce",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "token",
-      "outputs": [
-        {
-          "internalType": "contract GuaraniToken",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    }
+  const senderAbi = [
+    "event Locked(uint256 indexed id, address indexed from, address indexed to, uint256 amount)",
+    "function lock(address,uint256)",
+    "function nonce() view returns (uint256)",
+    "function lockedBalance() view returns (uint256)"
   ];
-
-  const token  = new ethers.Contract(CFG.TOKEN_N1 || "0x5FbDB2315678afecb367f032d93F642f64180aa3", abiToken , signer);
-  const sender = new ethers.Contract(SENDER_L1, abiSender, signer);
-
-  document.getElementById("btn-bridge").onclick = async () => {
-    try {
-      console.log('escuchando');
-      await switchTo(CHAIN_L1);
-
-      const dest   = document.getElementById("dest").value.trim();
-      const amount = ethers.parseUnits(document.getElementById("amt").value || "0", 18);
-      if (!ethers.isAddress(dest)) return alert("Dirección destino inválida");
-
-      /* approve if needed */
-      const allow = await token.allowance(signer.address, SENDER_L1);
-      if (allow < amount) {
-        log("approve…");
-        const tx = await token.approve(SENDER_L1, amount);
-        await tx.wait(); log("approve ok");
-      }
-
-      /* lock */
-      log("lock…");
-      const tx2 = await sender.lock(dest, amount);
-      await tx2.wait();
-      const idBN   = await sender.nonce();
-      const lockId = idBN - 1n; // BigInt math OK
-      log(`✅ Locked id ${lockId.toString()}, amount ${ethers.formatUnits(amount,18)} GUA`);
-      log("🔄 Espera que el relayer acuñe en L2…");
-      if (BRIDGE_MODE === "zk") startZkWaitTicker();
-
-    } catch (e) {
-      console.error("Bridge error:", e);
-      
-      let errorMsg = "Error desconocido";
-      
-      if (e.message?.includes("nonce")) {
-        errorMsg = "Error de nonce. Por favor intenta nuevamente.";
-      } else if (e.message?.includes("insufficient funds")) {
-        errorMsg = "Fondos insuficientes";
-      } else if (e.message?.includes("allowance")) {
-        errorMsg = "Error de allowance";
-      } else if (e.code === "ACTION_REJECTED") {
-        errorMsg = "Transacción rechazada por el usuario";
-      } else if (e.message?.includes("Internal JSON-RPC error")) {
-        errorMsg = "Error interno del nodo. Verifica que tengas tokens suficientes.";
-      } else {
-        errorMsg = e?.info?.error?.message || e.shortMessage || e.message;
-      }
-      
-      log("❌ " + errorMsg);
-    }
-  };
-  // Escuchar el evento Minted del contrato en L2
-  // ABI del evento Minted (ajusta los parámetros según tu contrato)
-  const abiMinted = [
-    {
-      "inputs": [
-        {
-          "internalType": "contract GuaraniToken",
-          "name": "_token",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "_relayer",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "constructor"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "id",
-          "type": "uint256"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        }
-      ],
-      "name": "Minted",
-      "type": "event"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "id",
-          "type": "uint256"
-        },
-        {
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        }
-      ],
-      "name": "mintRemote",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "name": "processed",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "relayer",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "token",
-      "outputs": [
-        {
-          "internalType": "contract GuaraniToken",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    }
-  ];
-  // Contract addresses and providers setup
-  const TOKEN_L1 = CFG.TOKEN_N1 || "0x5FbDB2315678afecb367f032d93F642f64180aa3"; // Token L1
-  const CONTRACT_L1 = CFG.SENDER_N1 || "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"; // Sender L1
-  const TOKEN_L2 = CFG.TOKEN_N2 || "0x8464135c8F25Da09e49BC8782676a84730C318bC"; // Token L2
-  const CONTRACT_L2 = CFG.RECEIVER_N2 || "0x71C95911E9a5D330f4D621842EC243EE1343292e"; // Receiver L2
-
-  // Note: Browser always connects to localhost (mapped ports from docker-compose)
-  // Docker containers expose ports: hardhat-n1:8545->8545, anvil-n2:9545->9545
-  const providerL1 = new ethers.JsonRpcProvider("http://localhost:8545"); // L1 Hardhat port
-  const providerL2 = new ethers.JsonRpcProvider("http://localhost:9545"); // L2 Anvil port
-
-  // Create token contracts for balance queries
-  const tokenL1 = new ethers.Contract(TOKEN_L1, abiToken, providerL1);
-  const tokenL2 = new ethers.Contract(TOKEN_L2, abiToken, providerL2);
-  
-  // Create bridge contracts for events  
-  const contractL1 = new ethers.Contract(CONTRACT_L1, abiSender, providerL1);
-  // ABI con ambos eventos (Minted clásico / Released ZK) → escuchamos el del modo activo.
-  const eventsAbiL2 = [
+  const receiverEventsAbi = [
     "event Minted(uint256 indexed id, address indexed to, uint256 amount)",
     "event Released(uint256 indexed id, address indexed to, uint256 amount)"
   ];
-  const contractL2 = new ethers.Contract(CONTRACT_L2, eventsAbiL2, providerL2);
 
-  contractL2.on(N2_EVENT, (id, to, amount, event) => {
-    stopZkWaitTicker();
-    const icon = N2_EVENT === "Released" ? "🔓" : "🎉";
-    log(`${icon} ${N2_EVENT}: id=${id}, to=${to}, amount=${ethers.formatUnits(amount,18)} GUA`);
+  const providerL1 = new ethers.JsonRpcProvider(CFG.RPC_URL_N1 || "http://localhost:8545");
+  const providerL2 = new ethers.JsonRpcProvider(CFG.RPC_URL_N2 || "http://localhost:9545");
+  const senderViewL1 = new ethers.Contract(SENDER_L1, senderAbi, providerL1);
+  const tokenViewL1  = new ethers.Contract(TOKEN_L1, tokenAbi, providerL1);
+  const tokenViewL2  = new ethers.Contract(TOKEN_L2, tokenAbi, providerL2);
+  const receiverL2   = new ethers.Contract(RECEIVER_L2, receiverEventsAbi, providerL2);
+
+  /* ═══════════════════════ palette & steps ═══════════════════════ */
+  const PAL_LIGHT = { terra: "#d67f48", terraDeep: "#8c491a", sage: "#728157", ink: "#645c50",
+    nodeFill: "#f9f4ed", nodeText: "#f9f4ed", pendingText: "#645c50", pendingStroke: "#a19786",
+    caption: "#201e1d", captionWon: "#3d472b", captionSub: "#645c50",
+    glowTerra: "rgba(214,127,72,.4)", glowSage: "rgba(114,129,87,.55)" };
+  const PAL_DARK = { terra: "#f6a06b", terraDeep: "#ffc6a5", sage: "#aebf92", ink: "#82796a",
+    nodeFill: "#2e2b25", nodeText: "#201e1d", pendingText: "#c0b6a5", pendingStroke: "#82796a",
+    caption: "#f9f4ed", captionWon: "#ccdbb2", captionSub: "#c0b6a5",
+    glowTerra: "rgba(246,160,107,.45)", glowSage: "rgba(174,191,146,.5)" };
+
+  const STEPS = IS_ZK
+    ? [
+        { title: "Bloqueo en Origen", sub: "Los tokens quedan retenidos en el contrato Sender de la L1." },
+        { title: "Prueba ZK y verificación", sub: "El relayer genera la prueba Groth16 y el verificador la valida en destino." },
+        { title: "Acuñado en Destino", sub: "Se liberan los fondos en la billetera receptora." }
+      ]
+    : [
+        { title: "Bloqueo en Origen", sub: "Los tokens quedan retenidos en el contrato Sender de la L1." },
+        { title: "Relayer transmitiendo", sub: "El relayer detecta el bloqueo y confía el mint en destino." },
+        { title: "Acuñado en Destino", sub: "Se liberan los fondos en la billetera receptora." }
+      ];
+
+  /* ═══════════════════════ state ═══════════════════════ */
+  const state = {
+    dark: false,
+    signer: null, address: null,
+    addr: "", amount: "10",
+    phase: "idle", // idle | locking | inflight | done
+    selected: null,
+    tx: null, // { lockHash, lockBlock, lockGas, startedAt, mintHash, mintBlock, mintTo, mintAmount }
+    flash: false,
+    log: ["esperando conexión de wallet…"]
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const clock = () => { const d = new Date(); return [d.getHours(), d.getMinutes(), d.getSeconds()].map(v => String(v).padStart(2, "0")).join(":"); };
+  const short = (a) => a && a.length > 14 ? a.slice(0, 8) + "…" + a.slice(-6) : (a || "—");
+  const fmt = (n) => Number(n).toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const addrValid = () => ethers.isAddress(state.addr.trim());
+  const amt = () => { const v = parseFloat(String(state.amount).replace(",", ".")); return isFinite(v) && v > 0 ? v : 0; };
+  const log = (m) => { state.log = state.log.concat(`[${clock()}] ${m}`); renderLog(); };
+  const pal = () => state.dark ? PAL_DARK : PAL_LIGHT;
+
+  function stepState(i) {
+    const { phase } = state;
+    if (phase === "idle") return "idle";
+    if (phase === "locking") return i === 0 ? "active" : "pending";
+    if (phase === "inflight") return i === 0 ? "done" : i === 1 ? "active" : "pending";
+    return "done"; // phase === "done"
+  }
+
+  /* ═══════════════════════ ñandutí lace svg ═══════════════════════ */
+  function pt(cx, cy, r, a) { return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
+
+  function flower(cx, cy, R, key, mode) {
+    const P = pal(), out = [];
+    const spokes = 16, rings = [0.3, 0.54, 0.78, 1];
+    const lit = mode === "lit", won = mode === "won";
+    const stroke = won ? P.sage : lit ? P.terra : P.ink;
+    const op = won ? 0.95 : lit ? 0.9 : 0.42;
+    const g = 2 * Math.PI / spokes;
+    for (let i = 0; i < spokes; i++) {
+      const [x, y] = pt(cx, cy, R, i * g);
+      out.push(`<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${stroke}" stroke-width="${i % 4 === 0 ? 1.5 : 0.8}" opacity="${op * 0.75}"/>`);
+    }
+    rings.forEach((rr, ri) => {
+      const r = R * rr;
+      let d = "";
+      for (let i = 0; i < spokes; i++) {
+        const a1 = i * g, a2 = (i + 1) * g, am = (a1 + a2) / 2;
+        const p1 = pt(cx, cy, r, a1), p2 = pt(cx, cy, r, a2), pm = pt(cx, cy, r * (ri === rings.length - 1 ? 1.16 : 1.1), am);
+        d += `M${p1[0].toFixed(1)} ${p1[1].toFixed(1)} Q${pm[0].toFixed(1)} ${pm[1].toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)} `;
+      }
+      out.push(`<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${ri % 2 ? 1.2 : 0.9}" opacity="${op * (0.55 + ri * 0.12)}"/>`);
+      if (ri > 0) for (let i = 0; i < spokes; i++) {
+        const [x, y] = pt(cx, cy, r, i * g);
+        out.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${ri === rings.length - 1 ? 2.2 : 1.5}" fill="${stroke}" opacity="${op * 0.7}"/>`);
+      }
+    });
+    for (let i = 0; i < spokes; i++) {
+      const a1 = i * g, a2 = (i + 2) * g;
+      const p1 = pt(cx, cy, R * 0.54, a1), p2 = pt(cx, cy, R * 0.78, a2);
+      out.push(`<line x1="${p1[0].toFixed(1)}" y1="${p1[1].toFixed(1)}" x2="${p2[0].toFixed(1)}" y2="${p2[1].toFixed(1)}" stroke="${stroke}" stroke-width="0.6" opacity="${op * 0.4}"/>`);
+    }
+    out.push(`<circle cx="${cx}" cy="${cy}" r="22" fill="none" stroke="${stroke}" stroke-width="1.4" opacity="${op}"/>`);
+    out.push(`<circle cx="${cx}" cy="${cy}" r="9" fill="${stroke}" opacity="${op}"/>`);
+    const anim = won ? "ndBloom 1.1s ease both" : lit ? "ndBreathe 3.4s ease-in-out infinite" : "none";
+    const glow = won ? `drop-shadow(0 0 10px ${P.glowSage})` : lit ? `drop-shadow(0 0 8px ${P.glowTerra})` : "none";
+    return `<g style="animation:${anim};transform-origin:${cx}px ${cy}px;filter:${glow}">${out.join("")}</g>`;
+  }
+
+  function cocoon(size, spinning) {
+    const P = pal(), o = [];
+    for (let i = 0; i < 3; i++) {
+      o.push(`<circle r="${(size * (1 - i * 0.26)).toFixed(1)}" fill="none" stroke="${P.terra}" stroke-width="1.1" stroke-dasharray="${i === 1 ? "3 4" : "5 5"}" style="${spinning ? `animation:ndSpin ${3 + i}s linear infinite;animation-direction:${i % 2 ? "reverse" : "normal"}` : ""}"/>`);
+    }
+    [0, 45].forEach((rot) => o.push(`<rect x="${-size * 0.5}" y="${-size * 0.5}" width="${size}" height="${size}" fill="none" stroke="${P.terraDeep}" stroke-width="0.9" opacity="0.85" transform="rotate(${rot})"/>`));
+    o.push(`<circle r="${(size * 0.24).toFixed(1)}" fill="${P.terra}"/>`);
+    return o.join("");
+  }
+
+  function buildMap() {
+    const P = pal();
+    const { tx, phase, selected } = state;
+    const OX = 196, DX = 804, CY = 232, R = 126;
+    const originMode = tx ? (phase === "done" ? "won" : "lit") : "idle";
+    const destMode = phase === "done" ? "won" : (phase === "inflight" ? "lit" : "idle");
+    const A = 400, B = 600, MID = (A + B) / 2;
+    const nodes = [ { x: A, y: CY }, { x: MID, y: CY }, { x: B, y: CY } ];
+    const kids = [];
+
+    kids.push(`<g>${flower(OX, CY, R, "o", originMode)}</g>`);
+    kids.push(`<g>${flower(DX, CY, R, "d", destMode)}</g>`);
+
+    const moving = phase === "inflight";
+    kids.push(`<path d="M${A} ${CY} L${B} ${CY}" stroke="${tx ? P.terra : P.ink}" stroke-width="2" opacity="${tx ? 0.9 : 0.4}"/>`);
+    kids.push(`<path d="M${A} ${CY} L${B} ${CY}" stroke="${phase === "done" ? P.sage : P.terra}" stroke-width="3" stroke-dasharray="8 6" opacity="${moving ? 1 : 0}" style="${moving ? "animation:ndDash 1s linear infinite" : ""}"/>`);
+    for (let i = 0; i <= 10; i++) {
+      const x = A + i * (B - A) / 10;
+      kids.push(`<path d="M${x.toFixed(1)} ${CY - 16} Q${(x + 10).toFixed(1)} ${CY} ${x.toFixed(1)} ${CY + 16}" fill="none" stroke="${tx ? P.terra : P.ink}" stroke-width="0.7" opacity="0.35"/>`);
+    }
+
+    if (moving) {
+      const glow = `drop-shadow(0 0 8px ${P.glowTerra})`;
+      const body = IS_ZK
+        ? `<g style="filter:${glow}"><g style="animation:ndWeave 1.1s cubic-bezier(.2,.8,.2,1) both">${cocoon(19, true)}</g></g>`
+        : `<g style="filter:${glow}"><circle r="9" fill="${P.terra}" opacity="0.9" style="animation:ndBreathe 2.4s ease-in-out infinite"/><circle r="15" fill="none" stroke="${P.terra}" stroke-width="1" stroke-dasharray="3 4" opacity="0.7"/></g>`;
+      kids.push(`<g transform="translate(${MID},${CY})">${body}</g>`);
+    }
+
+    nodes.forEach((n, i) => {
+      const st = stepState(i);
+      const fill = st === "done" ? P.sage : st === "active" ? P.terra : P.nodeFill;
+      const stroke = st === "done" ? P.sage : st === "active" ? P.terraDeep : P.pendingStroke;
+      const clickable = st === "done" || st === "active";
+      const sel = selected === i;
+      const g = [];
+      if (st === "active") g.push(`<circle r="13" fill="none" stroke="${P.terra}" stroke-width="2" style="animation:ndHalo 1.6s ease-out infinite"/>`);
+      if (sel) g.push(`<circle r="22" fill="none" stroke="${P.terraDeep}" stroke-width="1.2" stroke-dasharray="3 3" opacity="0.8"/>`);
+      g.push(`<circle r="14" fill="${fill}" stroke="${stroke}" stroke-width="1.6" stroke-dasharray="${st === "pending" ? "3 3" : "none"}"/>`);
+      g.push(`<text text-anchor="middle" y="5" font-size="14" font-weight="700" font-family="Figtree, sans-serif" fill="${st === "done" || st === "active" ? P.nodeText : P.pendingText}">${i + 1}</text>`);
+      g.push(`<text text-anchor="middle" y="${i % 2 ? 42 : -28}" font-size="14" font-family="'Roboto Mono', monospace" letter-spacing="0.04em" fill="${P.captionSub}">${STEPS[i].title}</text>`);
+      kids.push(`<g transform="translate(${n.x},${n.y})" data-step="${i}" style="cursor:${clickable ? "pointer" : "default"}">${g.join("")}</g>`);
+    });
+
+    const cap = (x, title, sub, mode) => `<g>
+      <text x="${x}" y="${CY - 6}" text-anchor="middle" font-family="Caprasimo, serif" font-size="26" fill="${mode === "won" ? P.captionWon : P.caption}">${title}</text>
+      <text x="${x}" y="${CY + 20}" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="14" letter-spacing="0.08em" fill="${P.captionSub}">${sub}</text>
+    </g>`;
+    kids.push(cap(OX, "Origen L1", state.chainL1 || "…", originMode));
+    kids.push(cap(DX, "Destino L2", state.chainL2 || "…", destMode));
+
+    return `<svg viewBox="0 0 1000 470" style="width:100%;height:auto;display:block;max-height:48vh">${kids.join("")}</svg>`;
+  }
+
+  function brandMark() {
+    const P = pal(), o = [];
+    for (let i = 0; i < 12; i++) {
+      const a = i * Math.PI / 6;
+      o.push(`<line x1="20" y1="20" x2="${(20 + 17 * Math.cos(a)).toFixed(1)}" y2="${(20 + 17 * Math.sin(a)).toFixed(1)}" stroke="${P.terra}" stroke-width="1"/>`);
+    }
+    o.push(`<circle cx="20" cy="20" r="17" fill="none" stroke="${P.terra}" stroke-width="1.4"/>`);
+    o.push(`<circle cx="20" cy="20" r="10" fill="none" stroke="${P.sage}" stroke-width="1.2"/>`);
+    o.push(`<circle cx="20" cy="20" r="4" fill="${P.terra}"/>`);
+    return `<svg viewBox="0 0 40 40" width="40" height="40">${o.join("")}</svg>`;
+  }
+
+  /* ═══════════════════════ render ═══════════════════════ */
+  function renderLog() {
+    $("log-panel").innerHTML = state.log.map(l => `<div>${l}</div>`).join("");
+    $("log-panel").scrollTop = $("log-panel").scrollHeight;
+  }
+
+  function renderSteps() {
+    $("steps-list").innerHTML = STEPS.map((s, i) => {
+      const st = stepState(i);
+      const sel = state.selected === i;
+      const clickable = st === "done" || st === "active";
+      const status = st === "done" ? "listo" : st === "active" ? "en curso" : "en espera";
+      return `<button class="step-row ${clickable ? "clickable" : ""} ${sel ? "selected" : ""}" data-step="${i}" ${clickable ? "" : "disabled"}>
+        <span class="step-dot ${st === "active" ? "active" : ""}" style="background:${st === "pending" || st === "idle" ? "" : (st === "done" ? "var(--color-accent-2-600)" : "var(--color-accent-600)")};color:${st === "pending" || st === "idle" ? "" : "#f9f4ed"}">${i + 1}</span>
+        <span style="display:flex;flex-direction:column;gap:2px;text-align:left;min-width:0">
+          <span class="step-title">${s.title}</span>
+          <span class="step-sub">${s.sub}</span>
+        </span>
+        <span class="step-status">${status}</span>
+      </button>`;
+    }).join("");
+    Array.from(document.querySelectorAll(".step-row.clickable")).forEach(btn => {
+      btn.onclick = () => { state.selected = Number(btn.dataset.step); render(); };
+    });
+    const posLabel = state.phase === "idle" ? "en espera" : state.phase === "done" ? `${STEPS.length} / ${STEPS.length} completado`
+      : `${state.phase === "locking" ? 1 : 2} / ${STEPS.length} en curso`;
+    $("progress-label").textContent = posLabel;
+  }
+
+  function renderMap() {
+    $("map-holder").innerHTML = buildMap();
+    Array.from(document.querySelectorAll("[data-step]")).forEach(el => {
+      const i = Number(el.dataset.step);
+      if (stepState(i) === "done" || stepState(i) === "active") {
+        el.onclick = () => { state.selected = i; render(); };
+      }
+    });
+  }
+
+  function detailsFor(i) {
+    const tx = state.tx;
+    if (!tx) return null;
+    if (i === 0) return [
+      { k: "Transacción", v: tx.lockHash },
+      { k: "Bloque L1", v: String(tx.lockBlock) },
+      { k: "Gas usado", v: tx.lockGas },
+      { k: "Monto", v: fmt(amt()) + " GUA" }
+    ];
+    if (i === 1) return [
+      { k: "Contrato Sender", v: SENDER_L1 },
+      { k: "Evento esperado", v: N2_EVENT + " en Receiver (L2)" },
+      { k: "Estado", v: tx.mintHash ? "confirmado" : "esperando al relayer…" }
+    ];
+    if (!tx.mintHash) return [{ k: "Estado", v: "esperando al relayer…" }];
+    return [
+      { k: "Transacción", v: tx.mintHash },
+      { k: "Bloque L2", v: String(tx.mintBlock) },
+      { k: "Receptor", v: tx.mintTo },
+      { k: "Acuñado", v: fmt(Number(tx.mintAmount)) + " GUA" }
+    ];
+  }
+
+  function renderDetail() {
+    const i = state.selected;
+    const rows = i == null ? null : detailsFor(i);
+    $("detail-title").textContent = rows ? `Nodo ${i + 1} · ${STEPS[i].title}` : "Detalle del nodo";
+    $("detail-rows").innerHTML = rows
+      ? rows.map(r => `<div class="detail-row"><span class="k">${r.k}</span><span class="v mono">${r.v}</span></div>`).join("")
+      : `<div class="detail-row"><span class="k">—</span><span class="v">Tocá un paso para ver su detalle</span></div>`;
+  }
+
+  let balCache = { l1Lock: null, l1Wallet: null, l2Mint: null, l2Wallet: null };
+  function renderBalances() {
+    const flashCls = state.flash ? "flashcell flash" : "flashcell";
+    const dest = addrValid() ? state.addr : (state.address || "—");
+    $("balances-holder").innerHTML = `
+      <div class="net-block">
+        <div class="net-head">
+          <span class="net-chip" style="background:var(--color-accent-200);color:var(--color-accent-800)">Origen</span>
+          <span class="net-name">Red N1 · Hardhat</span>
+          <span class="net-rpc mono">127.0.0.1:8545</span>
+        </div>
+        <table class="table" style="width:100%;font-size:12.5px">
+          <tbody>
+            <tr><td>Contrato Lock</td><td class="mono net-rpc">${short(SENDER_L1)}</td><td class="mono ${flashCls}" style="text-align:right;font-weight:500">${balCache.l1Lock ?? "…"} GUA</td></tr>
+            <tr><td>Tu billetera</td><td class="mono net-rpc">${short(state.address)}</td><td class="mono ${flashCls}" style="text-align:right;font-weight:500">${balCache.l1Wallet ?? "…"} GUA</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="net-block">
+        <div class="net-head">
+          <span class="net-chip" style="background:var(--color-accent-2-200);color:var(--color-accent-2-800)">Destino</span>
+          <span class="net-name">Red N2</span>
+          <span class="net-rpc mono">127.0.0.1:9545</span>
+        </div>
+        <table class="table" style="width:100%;font-size:12.5px">
+          <tbody>
+            <tr><td>Contrato Receiver</td><td class="mono net-rpc">${short(RECEIVER_L2)}</td><td class="mono ${flashCls}" style="text-align:right;font-weight:500">${balCache.l2Mint ?? "…"} GUA</td></tr>
+            <tr><td>Billetera destino</td><td class="mono net-rpc">${short(dest)}</td><td class="mono ${flashCls}" style="text-align:right;font-weight:500">${balCache.l2Wallet ?? "…"} GUA</td></tr>
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  function render() {
+    document.body.classList.toggle("dark", state.dark);
+    $("theme-label").textContent = state.dark ? "Oscuro" : "Claro";
+    $("mode-label").textContent = IS_ZK ? "ZK" : "CLÁSICO";
+    $("mode-sub").textContent = IS_ZK ? "ZK-BRIDGE UNIDIRECCIONAL" : "PUENTE CLÁSICO (RELAYER DE CONFIANZA)";
+    $("verb-lead").textContent = IS_ZK ? "teje la prueba" : "confía el relayer";
+    $("classic-warn").style.display = IS_ZK ? "none" : "flex";
+    $("brand-mark").innerHTML = brandMark();
+
+    const valid = addrValid(), amount = amt();
+    $("addr-dot").style.background = valid ? "var(--color-accent-2-600)" : "var(--color-accent-600)";
+    $("addr-msg").textContent = valid ? "Dirección L2 válida" : "Se esperan 42 caracteres hexadecimales (0x…)";
+    $("addr-msg").className = valid ? "addr-valid" : "addr-invalid";
+
+    const running = state.phase === "locking" || state.phase === "inflight";
+    const cta = $("cta-btn");
+    cta.classList.toggle("running", state.phase === "locking");
+    cta.disabled = !state.signer || running || !valid || amount <= 0;
+    $("cta-label").textContent = !state.signer ? "Conectá tu wallet"
+      : state.phase === "locking" ? "Bloqueando en origen…"
+      : state.phase === "inflight" ? "Tejiendo el puente…"
+      : state.phase === "done" ? "Téjer otro puente" : "Téjer puente";
+
+    renderSteps();
+    renderMap();
+    renderDetail();
+    renderBalances();
+  }
+
+  /* ═══════════════════════ wallet connect ═══════════════════════ */
+  if (!window.ethereum) {
+    log("❌ No se detectó una wallet inyectada (MetaMask).");
+  } else {
+    try {
+      const accounts = await ethereum.request({ method: "eth_accounts" });
+      if (accounts.length === 0) await ethereum.request({ method: "eth_requestAccounts" });
+      const provider = new ethers.BrowserProvider(ethereum);
+      state.signer = await provider.getSigner();
+      state.address = state.signer.address;
+      $("wallet-addr").textContent = short(state.address);
+      $("wallet-chip").querySelector(".dot").style.background = "var(--color-accent-2-600)";
+      log(`conectado ${short(state.address)}`);
+    } catch (e) {
+      log(e.code === -32002 ? "⚠️ MetaMask tiene una solicitud pendiente." : `❌ error de conexión: ${e.message}`);
+    }
+  }
+
+  try {
+    const [n1, n2] = await Promise.all([providerL1.getNetwork(), providerL2.getNetwork()]);
+    state.chainL1 = `chainId ${n1.chainId}`;
+    state.chainL2 = `chainId ${n2.chainId}`;
+  } catch (_) { /* nodos no disponibles aún */ }
+
+  /* ═══════════════════════ bridge action ═══════════════════════ */
+  const switchTo = async (hexId) => {
+    const provider = new ethers.BrowserProvider(ethereum);
+    const want = BigInt(parseInt(hexId, 16));
+    const now = (await provider.getNetwork()).chainId;
+    if (now !== want) await ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: hexId }] });
+  };
+
+  let waitTicker = null;
+  const stopTicker = () => { if (waitTicker) { clearInterval(waitTicker); waitTicker = null; } };
+  const startTicker = () => {
+    stopTicker();
+    const start = Date.now();
+    waitTicker = setInterval(() => {
+      const secs = Math.round((Date.now() - start) / 1000);
+      if (secs > 300) { log("⚠️ más de 5 min esperando — revisá `docker compose logs -f relayer`."); return stopTicker(); }
+      log(`… esperando al relayer (${secs}s)`);
+    }, 15000);
+  };
+
+  async function startBridge() {
+    if (!state.signer || state.phase === "locking" || state.phase === "inflight") return;
+    if (!addrValid() || amt() <= 0) return;
+    state.phase = "locking"; state.selected = 0; state.tx = null; render();
+    try {
+      await switchTo(CHAIN_L1);
+      const dest = state.addr.trim();
+      const amount = ethers.parseUnits(String(amt()), 18);
+      const provider = new ethers.BrowserProvider(ethereum);
+      const signer = await provider.getSigner();
+      const token = new ethers.Contract(TOKEN_L1, tokenAbi, signer);
+      const sender = new ethers.Contract(SENDER_L1, senderAbi, signer);
+
+      log(`init · ${IS_ZK ? "ZK ON · groth16" : "modo clásico"} · ${fmt(amt())} GUA → ${short(dest)}`);
+
+      const allow = await token.allowance(state.address, SENDER_L1);
+      if (allow < amount) { log("approve…"); const t = await token.approve(SENDER_L1, amount); await t.wait(); log("approve ok"); }
+
+      log("lock…");
+      const tx2 = await sender.lock(dest, amount);
+      const receipt = await tx2.wait();
+      const idBN = await sender.nonce();
+
+      state.tx = {
+        lockHash: tx2.hash, lockBlock: receipt.blockNumber, lockGas: receipt.gasUsed.toString(),
+        startedAt: Date.now(), id: (idBN - 1n).toString()
+      };
+      log(`✅ Locked id ${state.tx.id} · bloque ${receipt.blockNumber} · gas ${receipt.gasUsed}`);
+      log("🔄 esperando al relayer…");
+      state.phase = "inflight"; state.selected = 1; render();
+      startTicker();
+    } catch (e) {
+      state.phase = "idle"; render();
+      let msg = e?.info?.error?.message || e.shortMessage || e.message || "error desconocido";
+      if (e.code === "ACTION_REJECTED") msg = "transacción rechazada por el usuario";
+      else if (String(e.message).includes("insufficient funds")) msg = "fondos insuficientes";
+      log(`❌ ${msg}`);
+    }
+  }
+
+  receiverL2.on(N2_EVENT, (id, to, amount, ev) => {
+    stopTicker();
+    state.tx = { ...state.tx, mintHash: ev.log.transactionHash, mintBlock: ev.log.blockNumber, mintTo: to, mintAmount: ethers.formatUnits(amount, 18) };
+    const secs = ((Date.now() - (state.tx.startedAt || Date.now())) / 1000).toFixed(1);
+    log(`${IS_ZK ? "🔓" : "🎉"} ${N2_EVENT}: id=${id}, to=${short(to)}, amount=${ethers.formatUnits(amount, 18)} GUA`);
+    log(`✓ puente completado en ${secs}s`);
+    state.phase = "done"; state.selected = 2; render();
   });
 
-  // Balance Monitoring System
-  const accounts = [
+  /* ═══════════════════════ balances polling ═══════════════════════ */
+  async function refreshBalances() {
+    try {
+      const dest = addrValid() ? state.addr : state.address;
+      const [lock, w1, mint, w2] = await Promise.all([
+        senderViewL1.lockedBalance(),
+        state.address ? tokenViewL1.balanceOf(state.address) : 0n,
+        tokenViewL2.balanceOf(RECEIVER_L2),
+        dest ? tokenViewL2.balanceOf(dest) : 0n
+      ]);
+      balCache = {
+        l1Lock: fmt(ethers.formatUnits(lock, 18)),
+        l1Wallet: fmt(ethers.formatUnits(w1, 18)),
+        l2Mint: fmt(ethers.formatUnits(mint, 18)),
+        l2Wallet: fmt(ethers.formatUnits(w2, 18))
+      };
+      $("sender-balance").textContent = `Disponible ${balCache.l1Wallet} GUA`;
+      state.flash = true; renderBalances();
+      setTimeout(() => { state.flash = false; renderBalances(); }, 950);
+    } catch (e) { /* nodo no disponible todavía — se reintenta en el próximo tick */ }
+  }
+  setInterval(refreshBalances, 12000);
+  refreshBalances();
+
+  /* ═══════════════════════ accounts monitor (10 default hardhat accounts) ═══════════════════════ */
+  const MONITOR_ACCOUNTS = [
     "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-    "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", 
+    "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
     "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
     "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
     "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
@@ -1121,96 +708,39 @@
     "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720"
   ];
 
-  async function updateBalanceTable(networkId, provider, tokenContract, accountsList) {
-    const tableBody = document.getElementById(`${networkId}-balances`);
-    if (!tableBody) {
-      console.error(`Table body not found for ${networkId}-balances`);
-      return;
-    }
-    
-    tableBody.innerHTML = '';
-    
-    for (const account of accountsList) {
+  async function fillAccountsTable(tbodyId, provider, tokenContract) {
+    const tbody = $(tbodyId);
+    const rows = await Promise.all(MONITOR_ACCOUNTS.map(async (acc) => {
       try {
-        // Test if we can connect to the provider first
-        await provider.getBlockNumber();
-        
-        // Get ETH balance
-        const ethBalance = await provider.getBalance(account);
-        const ethBalanceFormatted = parseFloat(ethers.formatEther(ethBalance)).toFixed(4);
-        
-        // Get GUA token balance
-        const tokenBalance = await tokenContract.balanceOf(account);
-        const guaBalanceFormatted = parseFloat(ethers.formatUnits(tokenBalance, 18)).toFixed(2);
-        
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td style="font-family: monospace; font-size: 12px;">${account}</td>
-          <td>${ethBalanceFormatted} ETH</td>
-          <td>${guaBalanceFormatted} GUA</td>
-        `;
-        tableBody.appendChild(row);
-      } catch (error) {
-        console.error(`Error fetching balance for ${account}:`, error);
-        let errorMsg = "Error";
-        
-        if (error.message.includes("could not decode result data")) {
-          errorMsg = "Contract not found";
-        } else if (error.message.includes("network")) {
-          errorMsg = "Network error";
-        } else if (error.code === 'NETWORK_ERROR') {
-          errorMsg = "RPC error";
-        }
-        
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td style="font-family: monospace; font-size: 12px;">${account}</td>
-          <td>${errorMsg}</td>
-          <td>${errorMsg}</td>
-        `;
-        tableBody.appendChild(row);
+        const [eth, gua] = await Promise.all([provider.getBalance(acc), tokenContract.balanceOf(acc)]);
+        return `<tr><td>${acc}</td><td>${parseFloat(ethers.formatEther(eth)).toFixed(4)}</td><td>${parseFloat(ethers.formatUnits(gua, 18)).toFixed(2)}</td></tr>`;
+      } catch (e) {
+        return `<tr><td>${acc}</td><td colspan="2">error</td></tr>`;
       }
-    }
+    }));
+    tbody.innerHTML = rows.join("");
   }
 
-  async function updateAllBalances() {
-    try {
-      console.log('Updating L1 balances...');
-      console.log('L1 Provider URL:', providerL1._getConnection().url);
-      console.log('L1 Token Address:', TOKEN_L1);
-      
-      await updateBalanceTable('l1', providerL1, tokenL1, accounts);
-      
-      console.log('Updating L2 balances...');
-      console.log('L2 Provider URL:', providerL2._getConnection().url);
-      console.log('L2 Token Address:', TOKEN_L2);
-      
-      await updateBalanceTable('l2', providerL2, tokenL2, accounts);
-      
-      // Update contract addresses display
-      const l1ContractElement = document.getElementById('l1-contract-address');
-      const l2ContractElement = document.getElementById('l2-contract-address');
-      if (l1ContractElement) l1ContractElement.textContent = TOKEN_L1;
-      if (l2ContractElement) l2ContractElement.textContent = TOKEN_L2;
-      
-      console.log('Balance update completed');
-    } catch (error) {
-      console.error('Error updating balances:', error);
-      // Show user-friendly error message
-      if (error.code === -32002) {
-        log("⚠️ MetaMask request pending. Please complete the pending request and try again.");
-      } else {
-        log(`❌ Error updating balances: ${error.message}`);
-      }
-    }
+  async function refreshAccountsMonitor() {
+    await Promise.all([
+      fillAccountsTable("mon-l1-body", providerL1, tokenViewL1),
+      fillAccountsTable("mon-l2-body", providerL2, tokenViewL2)
+    ]);
+    if (state.chainL1) $("mon-chain-l1").textContent = state.chainL1;
+    if (state.chainL2) $("mon-chain-l2").textContent = state.chainL2;
   }
+  $("mon-refresh-l1").addEventListener("click", () => fillAccountsTable("mon-l1-body", providerL1, tokenViewL1));
+  $("mon-refresh-l2").addEventListener("click", () => fillAccountsTable("mon-l2-body", providerL2, tokenViewL2));
+  setInterval(refreshAccountsMonitor, 10000);
+  refreshAccountsMonitor();
 
-  // Auto-refresh balances every 10 seconds
-  setInterval(updateAllBalances, 10000);
-  
-  // Initial balance load
-  updateAllBalances();
-  
+  /* ═══════════════════════ wire up static controls ═══════════════════════ */
+  $("nd-addr").addEventListener("input", (e) => { state.addr = e.target.value; render(); });
+  $("nd-amt").addEventListener("input", (e) => { state.amount = e.target.value; render(); });
+  $("cta-btn").addEventListener("click", startBridge);
+  $("theme-toggle").addEventListener("click", () => { state.dark = !state.dark; render(); });
+
+  render();
 })();
 </script>
 </body>

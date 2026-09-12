@@ -57,5 +57,16 @@ export default {
         count: 20,
       },
     },
+    // Testnets — cuentas reales financiadas por faucet, no la mnemonic de test.
+    sepolia: {
+      url: process.env.RPC_URL_N1 || "",
+      chainId: 11155111,
+      accounts: process.env.PRIVATE_KEY_DEPLOYER ? [process.env.PRIVATE_KEY_DEPLOYER] : [],
+    },
+    opSepolia: {
+      url: process.env.RPC_URL_N2 || "",
+      chainId: 11155420,
+      accounts: process.env.PRIVATE_KEY_DEPLOYER ? [process.env.PRIVATE_KEY_DEPLOYER] : [],
+    },
   },
 };
