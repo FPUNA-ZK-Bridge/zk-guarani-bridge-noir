@@ -1,5 +1,11 @@
 # Guarani Bridge
 
+[![Solidity](https://img.shields.io/badge/Solidity-0.8.24%20%7C%200.8.28-363636?logo=solidity&logoColor=white)](hardhat.config.js)
+[![Hardhat](https://img.shields.io/badge/Hardhat-2.22-FFF04D?logo=hardhat&logoColor=black)](https://hardhat.org)
+[![ethers.js](https://img.shields.io/badge/ethers.js-6.15-2535A0)](https://docs.ethers.org)
+[![Noir](https://img.shields.io/badge/Noir-1.0.0--beta.22-6E56CF)](https://noir-lang.org)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
+
 Puente de tokens entre dos cadenas (L1 ↔ L2) que transfiere **GuaraniToken (GUA)** con el
 patrón **lock-and-mint**: el token se bloquea en la cadena de origen y se acuña un equivalente
 en la de destino. Tiene dos modos de liberar los fondos en destino, elegidos con
