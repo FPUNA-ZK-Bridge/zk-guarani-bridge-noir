@@ -1,10 +1,18 @@
-# Guarani Bridge
+<p align="center">
+  <img src="Header.png" alt="Guarani Bridge" width="100%" />
+</p>
 
-[![Solidity](https://img.shields.io/badge/Solidity-0.8.24%20%7C%200.8.28-363636?logo=solidity&logoColor=white)](hardhat.config.js)
-[![Hardhat](https://img.shields.io/badge/Hardhat-2.22-FFF04D?logo=hardhat&logoColor=black)](https://hardhat.org)
-[![ethers.js](https://img.shields.io/badge/ethers.js-6.15-2535A0)](https://docs.ethers.org)
-[![Noir](https://img.shields.io/badge/Noir-1.0.0--beta.22-6E56CF)](https://noir-lang.org)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
+<h3 align="center">Diseño e implementación de un puente cross-chain con verificación on-chain mediante pruebas de conocimiento cero</h3>
+
+<p align="center">
+  <a href="hardhat.config.js"><img src="https://img.shields.io/badge/Solidity-0.8.24%20%7C%200.8.28-363636?logo=solidity&logoColor=white" alt="Solidity" /></a>
+  <a href="https://hardhat.org"><img src="https://img.shields.io/badge/Hardhat-2.22-FFF04D?logo=hardhat&logoColor=black" alt="Hardhat" /></a>
+  <a href="https://docs.ethers.org"><img src="https://img.shields.io/badge/ethers.js-6.15-2535A0" alt="ethers.js" /></a>
+  <a href="https://noir-lang.org"><img src="https://img.shields.io/badge/Noir-1.0.0--beta.22-6E56CF" alt="Noir" /></a>
+  <a href="docker-compose.yml"><img src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white" alt="Docker" /></a>
+</p>
+
+---
 
 Puente de tokens entre dos cadenas (L1 ↔ L2) que transfiere **GuaraniToken (GUA)** con el
 patrón **lock-and-mint**: el token se bloquea en la cadena de origen y se acuña un equivalente
